@@ -1,0 +1,21 @@
+title: $:/plugins/valpackett/tiddlypwa/config
+tags: $:/tags/ControlPanel
+caption: Storage and Sync
+
+!! Storage Usage
+
+Not yet implemented.
+
+!! Password Protection
+
+The password (or technically, the encryption key derived from it) is currently
+<$reveal type="match" state="$:/status/TiddlyPWARemembered" text="yes">
+''remembered'' on this device. <$button message="tiddlypwa-forget">Forget it</$button>?
+</$reveal>
+<$reveal type="nomatch" state="$:/status/TiddlyPWARemembered" text="yes">
+''not remembered'' on this device. <$button message="tiddlypwa-remember">Remember it</$button>?
+</$reveal>
+
+!! Synchronization
+
+Not yet implemented.

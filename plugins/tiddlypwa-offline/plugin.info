@@ -1,0 +1,9 @@
+{
+	"title": "$:/plugins/valpackett/tiddlypwa-offline",
+	"description": "Service Worker manager for offline support",
+	"author": "valpackett",
+	"core-version": ">=5.0.0",
+	"list": "readme license",
+	"source": "https://codeberg.org/valpackett/tiddlypwa",
+	"plugin-type": "plugin"
+}

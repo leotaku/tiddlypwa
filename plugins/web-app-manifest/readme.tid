@@ -1,0 +1,26 @@
+title: $:/plugins/valpackett/web-app-manifest/readme
+
+!! ~TiddlyPWA Manifest
+
+This plugin dynamically generates and applies a [[Web App Manifest|https://developer.mozilla.org/en-US/docs/Web/Manifest]]
+for the wiki, which is necessary for "add to home screen" style web app installation in browsers.
+
+You can also <$button message="tiddlypwa-get-manifest">download the current manifest as a file</$button> to integrate into the
+wiki's static HTML, which increases compatibility with [[browser bugs|https://github.com/mozilla-mobile/fenix/issues/16672]].
+The manifest file must be referenced from the file's `<head>` like so:
+
+```html
+<link rel=manifest href=manifest.json>
+```
+
+!!! Manifest Generation
+
+The `name` is taken from [[$:/plugins/valpackett/web-app-manifest/name]], which by default just includes the wiki's title.
+
+Colors are taken from [[$:/plugins/valpackett/web-app-manifest/background-color]] and
+[[$:/plugins/valpackett/web-app-manifest/theme-color]], which by default take the current pallette's colors.
+
+Icons are collected from tiddlers tagged with `$:/tags/ManifestIcon`, but if none have that tag, [[$:/favicon.ico]] is chosen if it exists.
+(Obviously you can add the tag to [[$:/favicon.ico]] if you want to use it //and// others.)
+Icons can be of any image type, including SVG.
+For each icon, tiddler fields `sizes` and `purpose` can be used to set these properties for the icon in the manifest.

@@ -1,0 +1,4 @@
+title: $:/plugins/valpackett/tiddlypwa/notif-opened
+
+Welcome back!
+You can <$button message="tiddlypwa-remember">remember your password</$button> if this device is trusted.

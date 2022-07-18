@@ -1,0 +1,24 @@
+title: TiddlyPWA
+
+TiddlyPWA is a suite of plugins and tools that turn [[TiddlyWiki 5|https://tiddlywiki.com]]
+into an ''offline-first'' [[Progressive Web App|https://web.dev/learn/pwa/progressive-web-apps/]]
+with ''encrypted'' local persistent storage and (TODO) efficient ''synchronization'' with a server
+application that can easily be hosted for free.
+
+!! Hosting a custom instance
+
+First, either start with this page or add the following plugins to a fresh TiddlyWiki file:
+
+{{$:/plugins/valpackett/tiddlypwa||$:/core/ui/Components/plugin-info}}
+{{$:/plugins/valpackett/tiddlypwa-offline||$:/core/ui/Components/plugin-info}}
+{{$:/plugins/valpackett/web-app-manifest||$:/core/ui/Components/plugin-info}}
+
+Then add any other plugins/themes/palettes you are going to use (important since TiddlyWiki
+won't load plugins from the local storage).
+
+It's also a really good idea to set a title, subtitle, and the list of default tiddlers,
+if you can live with those being unencrypted.
+
+Now save the wiki HTML file and upload it to a good static file host along with
+a very important [[sw.js|$:/plugins/valpackett/tiddlypwa-offline/sw.js]] file
+that must reside in the same directory.
