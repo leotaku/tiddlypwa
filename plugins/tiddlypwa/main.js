@@ -142,6 +142,7 @@ Formatted with `deno fmt`.
 						$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-opened');
 					} else {
 						$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-newwiki');
+						$tw.wiki.addToStory('$:/ControlPanel');
 					}
 					checked = true;
 				}
