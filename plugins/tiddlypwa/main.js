@@ -19,10 +19,6 @@ Formatted with `deno fmt`.
 	const utfenc = new TextEncoder('utf-8');
 	const utfdec = new TextDecoder('utf-8');
 
-	function titlehash(x) {
-		return crypto.subtle.digest('SHA-256', utfenc.encode(x));
-	}
-
 	function adb(req) {
 		return new Promise((resolve, reject) => {
 			req.onerror = (evt) => {
@@ -54,12 +50,13 @@ Formatted with `deno fmt`.
 			}
 
 			$tw.rootWidget.addEventListener('tiddlypwa-remember', (_evt) => {
-				this.db.transaction('session', 'readwrite').objectStore('session').put({ key: this.key }).onsuccess = (
-					_evt,
-				) => {
-					this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: 'yes' });
-					$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-remembered');
-				};
+				this.db.transaction('session', 'readwrite').objectStore('session').put({ key: this.key, mackey: this.mackey })
+					.onsuccess = (
+						_evt,
+					) => {
+						this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: 'yes' });
+						$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-remembered');
+					};
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-forget', (_evt) => {
@@ -93,6 +90,7 @@ Formatted with `deno fmt`.
 				const ses = await adb(this.db.transaction('session').objectStore('session').getAll());
 				if (ses.length > 0) {
 					this.key = ses[ses.length - 1].key;
+					this.mackey = ses[ses.length - 1].mackey;
 				}
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: ses.length > 0 ? 'yes' : 'no' });
 			}
@@ -129,6 +127,13 @@ Formatted with `deno fmt`.
 						{ name: 'AES-GCM', length: 256 },
 						false,
 						['encrypt', 'decrypt'],
+					);
+					this.mackey = await crypto.subtle.deriveKey(
+						{ name: 'PBKDF2', hash: 'SHA-256', iterations: 100000, salt: utfenc.encode('tiddlyhmac') },
+						pwdk,
+						{ name: 'HMAC', hash: 'SHA-256' },
+						false,
+						['sign'],
 					);
 					const cursor = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').openCursor());
 					if (cursor) {
@@ -180,7 +185,7 @@ Formatted with `deno fmt`.
 							!deleted && title && crypto.subtle.decrypt({ name: 'AES-GCM', iv: tiv }, this.key, title)
 						),
 					)
-						.then((titles) => cb(null, titles.filter((x) => !!x).map((t) => ({ title: utfdec.decode(t) }))))
+						.then((titles) => cb(null, titles.filter((x) => !!x).map((t) => ({ title: utfdec.decode(t).trimStart() }))))
 						.catch((e) => cb(e));
 				}
 				const { title, tiv, deleted } = cursor.value;
@@ -189,17 +194,25 @@ Formatted with `deno fmt`.
 			};
 		}
 
+		titlehash(x) {
+			// keyed (hmac) because sync servers don't need to be able to compare contents between different users
+			return crypto.subtle.sign('HMAC', this.mackey, utfenc.encode(x));
+		}
+
 		async _saveTiddler(tiddler) {
-			const thash = await titlehash(tiddler.fields.title);
-			const rawdata = utfenc.encode(this.wiki.getTiddlerAsJson(tiddler.fields.title));
-			const dhash = await crypto.subtle.digest('SHA-256', rawdata);
-			const iv = await crypto.getRandomValues(new Uint8Array(16));
+			const thash = await this.titlehash(tiddler.fields.title);
+			const jsondata = this.wiki.getTiddlerAsJson(tiddler.fields.title);
+			// padding because sync servers don't need to know the precise lengths of everything
+			const rawdata = utfenc.encode('\n'.repeat(512 - (jsondata.length % 512)) + jsondata);
+			const dhash = await crypto.subtle.sign('HMAC', this.mackey, rawdata);
+			// "if you use nonces longer than 12 bytes, they get hashed into 12 bytes anyway" - soatok.blog
+			const iv = await crypto.getRandomValues(new Uint8Array(12));
 			const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this.key, rawdata);
-			const tiv = await crypto.getRandomValues(new Uint8Array(16));
+			const tiv = await crypto.getRandomValues(new Uint8Array(12));
 			const title = await crypto.subtle.encrypt(
 				{ name: 'AES-GCM', iv: tiv },
 				this.key,
-				utfenc.encode(tiddler.fields.title),
+				utfenc.encode('\n'.repeat(64 - (tiddler.fields.title.length % 64)) + tiddler.fields.title),
 			);
 			await adb(
 				this.db.transaction('tiddlers', 'readwrite').objectStore('tiddlers').put({
@@ -219,10 +232,10 @@ Formatted with `deno fmt`.
 		}
 
 		async _loadTiddler(title) {
-			const thash = await titlehash(title);
+			const thash = await this.titlehash(title);
 			const obj = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').get(thash));
 			const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.iv }, this.key, obj.data);
-			return JSON.parse(utfdec.decode(data));
+			return JSON.parse(utfdec.decode(data).trimStart());
 		}
 
 		loadTiddler(title, cb) {
@@ -230,7 +243,7 @@ Formatted with `deno fmt`.
 		}
 
 		async _deleteTiddler(title) {
-			const thash = await titlehash(title);
+			const thash = await this.titlehash(title);
 			await adb(
 				this.db.transaction('tiddlers', 'readwrite').objectStore('tiddlers').put({
 					thash,
