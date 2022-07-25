@@ -1,0 +1,25 @@
+title: $:/plugins/valpackett/tiddlypwa/save-dialog
+
+!! Sync status
+
+TODO
+
+!! Export as ordinary single-file ~TiddlyWiki
+
+<$set name="tv-config-toolbar-icons" value="yes">
+<$set name="tv-config-toolbar-text" value="yes">
+<$set name="tv-config-toolbar-class" value="">
+
+To make a single-file backup of the wiki, you can {{$:/core/ui/Buttons/encryption}} &
+<$button>
+<$action-sendmessage $message="tm-download-file" publishFilter="-[prefix[$:/plugins/valpackett/tiddlypwa]]"/>
+save this wiki without !TiddlyPWA
+</$button>.
+
+Note that the native ~TiddlyWiki password that is configured via the button above will ''only''
+apply to files saved via this save button — it is completely independent of the ~TiddlyPWA storage password.
+
+!! Export as ~TiddlyPWA app HTML
+
+TODO:
+save this wiki without the content

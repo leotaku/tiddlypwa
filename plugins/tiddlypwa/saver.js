@@ -24,8 +24,8 @@ Formatted with `deno fmt`.
 			this.wiki = wiki;
 		}
 
-		save(text, method, cb) {
-			// TODO: offer to use the download saver with encryption
+		save(_text, _method, _cb, _options) {
+			$tw.modal.display('$:/plugins/valpackett/tiddlypwa/save-dialog', {});
 			return true;
 		}
 	}
