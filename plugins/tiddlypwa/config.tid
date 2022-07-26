@@ -18,4 +18,40 @@ The password (or technically, the encryption key derived from it) is currently
 
 !! Synchronization
 
-Not yet implemented.
+This device syncs wiki contents with the following servers:
+
+<table>
+<thead>
+    <tr>
+        <td>Server</td>
+        <td>Last sync</td>
+        <td></td>
+    </tr>
+</thead>
+<$list filter="[tag[$:/temp/TiddlyPWAServer]]">
+    <tr>
+        <td>
+            {{!!url}}<br>
+            <details>
+                <summary>token</summary>
+                <code>{{!!token}}</code>
+            </details>
+        </td>
+        <td style="width:35%">{{!!lastSync}}</td>
+        <td style="width:1%">
+            <$button>
+                <$action-sendmessage $message="tiddlypwa-delete-sync-server" key={{!!key}} />
+                Delete
+            </$button>
+        </td>
+    </tr>
+</$list>
+</table>
+
+<label>URL: <$edit-text tiddler="$:/temp/TiddlyPWAServerURL" tag="input" default="https://" /></label>
+<label>Token: <$edit-text tiddler="$:/temp/TiddlyPWAServerToken" tag="input" default="" /></label>
+<$button>
+<$action-sendmessage $message="tiddlypwa-add-sync-server"
+    url={{$:/temp/TiddlyPWAServerURL}} token={{$:/temp/TiddlyPWAServerToken}} />
+Add
+</$button>

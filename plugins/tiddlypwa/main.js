@@ -16,6 +16,11 @@ Formatted with `deno fmt`.
 		alert('Warning! TiddlyPWA must be served over HTTPS.');
 	}
 
+	const knownErrors = {
+		EPROTO: 'Protocol incompatibility',
+		ETIME: 'The time is too different between the server and the device',
+	};
+
 	const utfenc = new TextEncoder('utf-8');
 	const utfdec = new TextDecoder('utf-8');
 
@@ -31,9 +36,27 @@ Formatted with `deno fmt`.
 		});
 	}
 
+	async function b64enc(data) {
+		if (!data) {
+			return null;
+		}
+
+		return (await new Promise((resolve) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(reader.result);
+			reader.readAsDataURL(new Blob([data]));
+		})).split(',', 2)[1];
+	}
+
+	function b64dec(base64) {
+		// welp touching binary strings here but seems to be a decent compact way
+		return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)).buffer;
+	}
+
 	class PWAStorage {
 		constructor(options) {
 			this.wiki = options.wiki;
+			this.logger = new $tw.utils.Logger('tiddlypwa-storage');
 
 			// XXX: awful workaround for TW not refreshing the 'home' after the syncadaptor first loads $:/DefaultTiddlers
 			// (why is the timeout necessary?! without timeout we get a brief flash of the correct 'home' and then back to the file one o_0)
@@ -69,6 +92,68 @@ Formatted with `deno fmt`.
 				};
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: 'no' });
 			});
+
+			$tw.rootWidget.addEventListener('tiddlypwa-add-sync-server', (evt) => {
+				const url = evt && evt.paramObject && evt.paramObject.url;
+				const token = evt && evt.paramObject && evt.paramObject.token;
+				if (!url || !token) {
+					alert('A sync server must have a URL and a token!');
+					return;
+				}
+				try {
+					new URL(url);
+				} catch (_e) {
+					alert('The URL must be valid!');
+					return;
+				}
+				adb(
+					this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put({
+						url,
+						token,
+						lastSync: new Date(0),
+					}),
+				).then((_e) => this.reflectSyncServers()).catch((e) => {
+					this.logger.log(e);
+					alert('Failed to save the sync server!');
+				});
+			});
+
+			$tw.rootWidget.addEventListener('tiddlypwa-delete-sync-server', (evt) => {
+				const key = evt && evt.paramObject && evt.paramObject.key;
+				adb(
+					this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').delete(parseInt(key)),
+				).then((_e) => this.reflectSyncServers()).catch((e) => {
+					this.logger.log(e);
+					alert('Failed to delete the sync server!');
+				});
+			});
+
+			$tw.rootWidget.addEventListener('tiddlypwa-sync', (_evt) => {
+			});
+		}
+
+		reflectSyncServers() {
+			for (const tidname of this.wiki.getTiddlersWithTag('$:/temp/TiddlyPWAServer')) {
+				this.wiki.deleteTiddler(tidname);
+			}
+			return new Promise((resolve) =>
+				this.db.transaction('syncservers').objectStore('syncservers').openCursor().onsuccess = (evt) => {
+					const cursor = evt.target.result;
+					if (!cursor) {
+						return resolve();
+					}
+					const { url, token, lastSync } = cursor.value;
+					this.wiki.addTiddler({
+						title: '$:/temp/TiddlyPWAServers/' + cursor.key,
+						tags: ['$:/temp/TiddlyPWAServer'],
+						key: cursor.key,
+						url,
+						token,
+						lastSync: lastSync.getTime() === 0 ? 'never' : lastSync.toLocaleString(),
+					});
+					cursor.continue();
+				}
+			);
 		}
 
 		isReady() {
@@ -86,6 +171,7 @@ Formatted with `deno fmt`.
 				};
 				this.db = await adb(req);
 			}
+			await this.reflectSyncServers();
 			if (!this.key) {
 				const ses = await adb(this.db.transaction('session').objectStore('session').getAll());
 				if (ses.length > 0) {
@@ -222,13 +308,16 @@ Formatted with `deno fmt`.
 					dhash, // The data hash will be used for sync conflict resolution
 					data,
 					iv,
-					mtime: tiddler.fields.modified, // Has to be unencrypted for sync conflict resolution
+					mtime: tiddler.fields.modified || new Date(), // Has to be unencrypted for sync conflict resolution
 				}),
 			);
 		}
 
 		saveTiddler(tiddler, cb) {
-			this._saveTiddler(tiddler).then((_) => cb(null, '', 1)).catch((e) => cb(e));
+			this._saveTiddler(tiddler).then((_) => {
+				cb(null, '', 1);
+				this.backgroundSync();
+			}).catch((e) => cb(e));
 		}
 
 		async _loadTiddler(title) {
@@ -254,7 +343,117 @@ Formatted with `deno fmt`.
 		}
 
 		deleteTiddler(title, cb, _options) {
-			this._deleteTiddler(title).then((_) => cb(null)).catch((e) => cb(e));
+			this._deleteTiddler(title).then((_) => {
+				cb(null);
+				this.backgroundSync();
+			}).catch((e) => cb(e));
+		}
+
+		async _sync({ url, token, lastSync }) {
+			const now = new Date();
+			this.logger.log('sync started', url, lastSync, now);
+			const changes = [];
+			await new Promise((resolve) =>
+				this.db.transaction('tiddlers', 'readwrite').objectStore('tiddlers').openCursor().onsuccess = (evt) => {
+					const cursor = evt.target.result;
+					if (!cursor) {
+						return resolve();
+					}
+					if (cursor.value.mtime > lastSync) {
+						changes.push(cursor.value);
+					}
+					cursor.continue();
+				}
+			);
+			const clientChanges = [];
+			const changedKeys = new Set();
+			for (const { thash, title, tiv, dhash, data, iv, mtime, deleted } of changes) {
+				const tidjson = {
+					thash: await b64enc(thash),
+					title: await b64enc(title),
+					tiv: await b64enc(tiv),
+					dhash: await b64enc(dhash),
+					data: await b64enc(data),
+					iv: await b64enc(iv),
+					mtime,
+					deleted,
+				};
+				clientChanges.push(tidjson);
+				changedKeys.add(tidjson.thash);
+				this.logger.log('local change', tidjson.thash);
+			}
+			const resp = await fetch(url, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ tiddlypwa: 1, token, now, lastSync, clientChanges }),
+			});
+			if (!resp.ok) {
+				try {
+					const { error } = await resp.json();
+					throw new Exception(knownErrors[error] || error);
+				} catch (_e) {
+					throw new Exception('Server returned error ' + resp.status);
+				}
+			}
+			const { serverChanges } = await resp.json();
+			const txn = this.db.transaction('tiddlers', 'readwrite');
+			for (const { thash, title, tiv, dhash, data, iv, mtime, deleted } of serverChanges) {
+				const tid = {
+					thash: b64dec(thash),
+					title: b64dec(title),
+					tiv: b64dec(tiv),
+					dhash: b64dec(dhash),
+					data: b64dec(data),
+					iv: b64dec(iv),
+					mtime: new Date(mtime),
+					deleted,
+				};
+				this.logger.log('remote change', thash);
+				if (changedKeys.has(thash)) {
+					this.logger.log('conflict', thash);
+					// TODO: pick newer between the two, save older under special name, present results
+				}
+				txn.objectStore('tiddlers').put(tid);
+			}
+			this.logger.log('sync done', now);
+			return now;
+		}
+
+		async sync() {
+			if (this.isSyncing) {
+				return;
+			}
+			this.isSyncing = true;
+			const servers = [];
+			await new Promise((resolve) =>
+				this.db.transaction('syncservers').objectStore('syncservers').openCursor().onsuccess = (evt) => {
+					const cursor = evt.target.result;
+					if (!cursor) {
+						return resolve();
+					}
+					servers.push([cursor.key, cursor.value]);
+					cursor.continue();
+				}
+			);
+			for (const [key, server] of servers) {
+				try {
+					server.lastSync = await this._sync(server);
+					await adb(this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put(server, key));
+				} catch (e) {
+					this.logger.log('sync error', server.url, e);
+				}
+			}
+			$tw.syncer.syncFromServer(); // "server" being our local DB that we just updated, actually
+			await this.reflectSyncServers();
+			this.isSyncing = false;
+		}
+
+		backgroundSync() {
+			// debounced to handle multiple saves in quick succession
+			clearTimeout(this.syncTimer);
+			this.syncTimer = setTimeout(() => this.sync(), 1000);
 		}
 	}
 
