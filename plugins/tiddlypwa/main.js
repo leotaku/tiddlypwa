@@ -129,6 +129,7 @@ Formatted with `deno fmt`.
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-sync', (_evt) => {
+				this.sync();
 			});
 		}
 
@@ -387,7 +388,7 @@ Formatted with `deno fmt`.
 				headers: {
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({ tiddlypwa: 1, token, now, lastSync, clientChanges }),
+				body: JSON.stringify({ tiddlypwa: 1, op: 'sync', token, now, lastSync, clientChanges }),
 			});
 			if (!resp.ok) {
 				try {
