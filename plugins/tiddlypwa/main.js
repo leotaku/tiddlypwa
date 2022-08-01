@@ -207,7 +207,6 @@ Formatted with `deno fmt`.
 					return false;
 				}
 			}
-			$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-opened');
 			return true;
 		}
 
@@ -273,6 +272,9 @@ Formatted with `deno fmt`.
 						['sign'],
 					);
 					checked = await this.initialRead();
+					if (checked) {
+						$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-opened');
+					}
 				}
 				document.body.removeChild(backdrop);
 			} else {
