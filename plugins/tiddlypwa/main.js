@@ -323,9 +323,9 @@ Formatted with `deno fmt`.
 			const rawdata = utfenc.encode('\n'.repeat(512 - (jsondata.length % 512)) + jsondata);
 			const dhash = await crypto.subtle.sign('HMAC', this.mackey, rawdata);
 			// "if you use nonces longer than 12 bytes, they get hashed into 12 bytes anyway" - soatok.blog
-			const iv = await crypto.getRandomValues(new Uint8Array(12));
+			const iv = crypto.getRandomValues(new Uint8Array(12));
 			const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this.key, rawdata);
-			const tiv = await crypto.getRandomValues(new Uint8Array(12));
+			const tiv = crypto.getRandomValues(new Uint8Array(12));
 			const title = await crypto.subtle.encrypt(
 				{ name: 'AES-GCM', iv: tiv },
 				this.key,

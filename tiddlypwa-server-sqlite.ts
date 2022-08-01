@@ -125,9 +125,7 @@ function handleCreate({ atoken }: { atoken: any }) {
 	if (atoken !== admintoken) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	const tokbuf = new Uint8Array(32);
-	crypto.getRandomValues(tokbuf);
-	const token = base64.encode(tokbuf);
+	const token = base64.encode(crypto.getRandomValues(new Uint8Array(32)));
 	db.query(`INSERT INTO wikis (token) VALUES (:token)`, { token });
 	return Response.json({ token }, { headers: respHdrs, status: 201 });
 }
