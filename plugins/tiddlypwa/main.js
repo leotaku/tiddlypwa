@@ -53,6 +53,13 @@ Formatted with `deno fmt`.
 		return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)).buffer;
 	}
 
+	function arrayEq(a, b) {
+		const av = new Uint8Array(a);
+		const bv = new Uint8Array(b);
+		if (av.byteLength !== bv.byteLength) return false;
+		return av.every((val, i) => val === bv[i]);
+	}
+
 	class PWAStorage {
 		constructor(options) {
 			this.wiki = options.wiki;
@@ -280,6 +287,7 @@ Formatted with `deno fmt`.
 			} else {
 				await this.initialRead();
 			}
+			this.storyListHash = await this.titlehash('$:/StoryList');
 		}
 
 		getStatus(cb) {
@@ -409,6 +417,7 @@ Formatted with `deno fmt`.
 			const clientChanges = [];
 			const changedKeys = new Set();
 			for (const { thash, title, tiv, dhash, data, iv, mtime, deleted } of changes) {
+				if (arrayEq(thash, this.storyListHash)) continue;
 				const tidjson = {
 					thash: await b64enc(thash),
 					title: await b64enc(title),
@@ -442,6 +451,7 @@ Formatted with `deno fmt`.
 			const titlesToRead = [];
 			const txn = this.db.transaction('tiddlers', 'readwrite');
 			for (const { thash, title, tiv, dhash, data, iv, mtime, deleted } of serverChanges) {
+				if (arrayEq(b64dec(thash), this.storyListHash)) continue;
 				const tid = {
 					thash: b64dec(thash),
 					title: b64dec(title),
