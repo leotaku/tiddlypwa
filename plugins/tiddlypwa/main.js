@@ -57,6 +57,17 @@ Formatted with `deno fmt`.
 		constructor(options) {
 			this.wiki = options.wiki;
 			this.logger = new $tw.utils.Logger('tiddlypwa-storage');
+			this.modifiedQueue = new Set();
+			this.deletedQueue = new Set();
+			this.changesChannel = new BroadcastChannel('changed-tiddlers');
+			this.changesChannel.onmessage = (evt) => {
+				if (evt.data.del) {
+					this.deletedQueue.add(evt.data.title);
+				} else {
+					this.modifiedQueue.add(evt.data.title);
+				}
+				$tw.syncer.syncFromServer(); // "server" being our local DB
+			};
 
 			// XXX: awful workaround for TW not refreshing the 'home' after the syncadaptor first loads $:/DefaultTiddlers
 			// (why is the timeout necessary?! without timeout we get a brief flash of the correct 'home' and then back to the file one o_0)
@@ -161,6 +172,45 @@ Formatted with `deno fmt`.
 			return !!(this.db && this.key);
 		}
 
+		async initialRead() {
+			const titlesToRead = [];
+			await new Promise((resolve) => {
+				this.db.transaction('tiddlers').objectStore('tiddlers').openCursor().onsuccess = (evt) => {
+					const cursor = evt.target.result;
+					if (!cursor) {
+						return resolve(true);
+					}
+					const { title, tiv, deleted } = cursor.value;
+					titlesToRead.push({ title, tiv, deleted });
+					cursor.continue();
+				};
+			});
+			if (titlesToRead.length === 0) {
+				$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-newwiki');
+				$tw.wiki.addToStory('$:/ControlPanel');
+				return true;
+			}
+			for (const { title, tiv, deleted } of titlesToRead) {
+				try {
+					if (deleted) {
+						continue;
+					}
+					const dectitle = await crypto.subtle.decrypt(
+						{ name: 'AES-GCM', iv: tiv },
+						this.key,
+						title,
+					);
+					this.modifiedQueue.add(utfdec.decode(dectitle).trimStart());
+				} catch (e) {
+					this.logger.log('Title decrypt failed:', e);
+					$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-badpass');
+					return false;
+				}
+			}
+			$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-opened');
+			return true;
+		}
+
 		async _getStatus() {
 			if (!this.db) {
 				const req = indexedDB.open(`tiddlypwa:${location.pathname}`, 1);
@@ -222,23 +272,11 @@ Formatted with `deno fmt`.
 						false,
 						['sign'],
 					);
-					const cursor = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').openCursor());
-					if (cursor) {
-						try {
-							await crypto.subtle.decrypt({ name: 'AES-GCM', iv: cursor.value.tiv }, this.key, cursor.value.title);
-						} catch (_e) {
-							checked = false;
-							$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-badpass');
-							continue;
-						}
-						$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-opened');
-					} else {
-						$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-newwiki');
-						$tw.wiki.addToStory('$:/ControlPanel');
-					}
-					checked = true;
+					checked = await this.initialRead();
 				}
 				document.body.removeChild(backdrop);
+			} else {
+				await this.initialRead();
 			}
 		}
 
@@ -262,23 +300,15 @@ Formatted with `deno fmt`.
 			return null;
 		}
 
-		getSkinnyTiddlers(cb) {
-			const tiddlers = [];
-			this.db.transaction('tiddlers').objectStore('tiddlers').openCursor().onsuccess = (evt) => {
-				const cursor = evt.target.result;
-				if (!cursor) {
-					return Promise.all(
-						tiddlers.map(({ title, tiv, deleted }) =>
-							!deleted && title && crypto.subtle.decrypt({ name: 'AES-GCM', iv: tiv }, this.key, title)
-						),
-					)
-						.then((titles) => cb(null, titles.filter((x) => !!x).map((t) => ({ title: utfdec.decode(t).trimStart() }))))
-						.catch((e) => cb(e));
-				}
-				const { title, tiv, deleted } = cursor.value;
-				tiddlers.push({ title, tiv, deleted });
-				cursor.continue();
+		getUpdatedTiddlers(_syncer, cb) {
+			const chg = {
+				modifications: [...this.modifiedQueue],
+				deletions: [...this.deletedQueue],
 			};
+			this.logger.log('Reflecting updates to wiki runtime', chg);
+			this.modifiedQueue.clear();
+			this.deletedQueue.clear();
+			cb(null, chg);
 		}
 
 		titlehash(x) {
@@ -317,6 +347,7 @@ Formatted with `deno fmt`.
 		saveTiddler(tiddler, cb) {
 			this._saveTiddler(tiddler).then((_) => {
 				cb(null, '', 1);
+				this.changesChannel.postMessage({ title: tiddler.fields.title });
 				this.backgroundSync();
 			}).catch((e) => cb(e));
 		}
@@ -329,7 +360,13 @@ Formatted with `deno fmt`.
 		}
 
 		loadTiddler(title, cb) {
-			this._loadTiddler(title).then((x) => cb(null, x)).catch((e) => cb(e));
+			this._loadTiddler(title).then((tiddler) => {
+				cb(null, tiddler);
+				if (title === $tw.syncer.titleSyncFilter) {
+					// XXX: syncer should itself monitor for changes and recompile
+					$tw.syncer.filterFn = this.wiki.compileFilter(tiddler.text);
+				}
+			}).catch((e) => cb(e));
 		}
 
 		async _deleteTiddler(title) {
@@ -346,6 +383,7 @@ Formatted with `deno fmt`.
 		deleteTiddler(title, cb, _options) {
 			this._deleteTiddler(title).then((_) => {
 				cb(null);
+				this.changesChannel.postMessage({ title, del: true });
 				this.backgroundSync();
 			}).catch((e) => cb(e));
 		}
@@ -399,6 +437,7 @@ Formatted with `deno fmt`.
 				}
 			}
 			const { serverChanges } = await resp.json();
+			const titlesToRead = [];
 			const txn = this.db.transaction('tiddlers', 'readwrite');
 			for (const { thash, title, tiv, dhash, data, iv, mtime, deleted } of serverChanges) {
 				const tid = {
@@ -417,6 +456,19 @@ Formatted with `deno fmt`.
 					// TODO: pick newer between the two, save older under special name, present results
 				}
 				txn.objectStore('tiddlers').put(tid);
+				if (deleted) {
+					// TODO: find title by hash in loaded tiddlers
+				} else {
+					titlesToRead.push({ title: tid.title, iv: tid.tiv });
+				}
+			}
+			for (const { title, iv } of titlesToRead) {
+				const dectitle = await crypto.subtle.decrypt(
+					{ name: 'AES-GCM', iv },
+					this.key,
+					title,
+				);
+				this.modifiedQueue.add(utfdec.decode(dectitle).trimStart());
 			}
 			this.logger.log('sync done', now);
 			return now;
