@@ -464,8 +464,12 @@ Formatted with `deno fmt`.
 				};
 				this.logger.log('remote change', thash);
 				if (changedKeys.has(thash)) {
-					this.logger.log('conflict', thash);
-					// TODO: pick newer between the two, save older under special name, present results
+					const ourtid = txn.objectStore('tiddlers').get(tid.thash);
+					this.logger.log('conflict:', thash, 'server:', tid.mtime, 'local:', ourtid.mtime);
+					if (ourtid.mtime > tid.mtime) {
+						continue;
+					}
+					// TODO: save the older tiddler under a special name and present conflict results
 				}
 				txn.objectStore('tiddlers').put(tid);
 				if (deleted) {
