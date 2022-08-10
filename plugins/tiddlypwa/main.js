@@ -152,8 +152,7 @@ Formatted with `deno fmt`.
 						lastSync: new Date(0),
 					}),
 				).then((_e) => this.reflectSyncServers()).catch((e) => {
-					this.logger.log(e);
-					alert('Failed to save the sync server!');
+					this.logger.alert('Failed to save the sync server!', e);
 				});
 			});
 
@@ -162,8 +161,7 @@ Formatted with `deno fmt`.
 				adb(
 					this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').delete(parseInt(key)),
 				).then((_e) => this.reflectSyncServers()).catch((e) => {
-					this.logger.log(e);
-					alert('Failed to delete the sync server!');
+					this.logger.alert('Failed to delete the sync server!', e);
 				});
 			});
 
@@ -483,9 +481,9 @@ Formatted with `deno fmt`.
 			if (!resp.ok) {
 				try {
 					const { error } = await resp.json();
-					throw new Exception(knownErrors[error] || error);
+					throw new Error(knownErrors[error] || error);
 				} catch (_e) {
-					throw new Exception('Server returned error ' + resp.status);
+					throw new Error('Server returned error ' + resp.status);
 				}
 			}
 			const { serverChanges } = await resp.json();
@@ -536,6 +534,7 @@ Formatted with `deno fmt`.
 				return;
 			}
 			this.isSyncing = true;
+			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncing', text: 'yes' });
 			const servers = [];
 			await new Promise((resolve) =>
 				this.db.transaction('syncservers').objectStore('syncservers').openCursor().onsuccess = (evt) => {
@@ -552,12 +551,13 @@ Formatted with `deno fmt`.
 					server.lastSync = await this._sync(server);
 					await adb(this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put(server, key));
 				} catch (e) {
-					this.logger.log('sync error', server.url, e);
+					this.logger.alert(`Could not sync with server "${server.url}"!`, e);
 				}
 			}
 			$tw.syncer.syncFromServer(); // "server" being our local DB that we just updated, actually
 			await this.reflectSyncServers();
 			await this.reflectStorageInfo();
+			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncing', text: 'no' });
 			this.isSyncing = false;
 		}
 

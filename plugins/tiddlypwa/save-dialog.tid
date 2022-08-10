@@ -17,7 +17,12 @@ title: $:/plugins/valpackett/tiddlypwa/save-dialog
 </$list>
 </table>
 
+<$reveal type="match" state="$:/status/TiddlyPWASyncing" text="no">
 <$button message="tiddlypwa-sync">Sync now</$button>?
+</$reveal>
+<$reveal type="match" state="$:/status/TiddlyPWASyncing" text="yes">
+Sync in progress.
+</$reveal>
 
 <$reveal type="match" state="$:/status/TiddlyPWAOnline" text="no">
 (You are currently ''offline'', but the button is still available just in case.)
