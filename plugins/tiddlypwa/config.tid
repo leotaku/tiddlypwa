@@ -2,6 +2,13 @@ title: $:/plugins/valpackett/tiddlypwa/config
 tags: $:/tags/ControlPanel
 caption: Storage and Sync
 
+<$reveal type="match" state="$:/status/TiddlyPWADemoMode" text="yes">
+TiddlyPWA is running in demo/installer mode.
+You can <$button message="tiddlypwa-init">start using ~TiddlyPWA</$button> on this page right now!
+</$reveal>
+
+<$reveal type="nomatch" state="$:/status/TiddlyPWADemoMode" text="yes">
+
 !! Browser Storage
 
 <$reveal type="match" state="$:/status/TiddlyPWAStoragePersisted" text="unavail">
@@ -72,3 +79,5 @@ This device syncs wiki contents with the following servers:
     url={{$:/temp/TiddlyPWAServerURL}} token={{$:/temp/TiddlyPWAServerToken}} />
 Add
 </$button>
+
+</$reveal>

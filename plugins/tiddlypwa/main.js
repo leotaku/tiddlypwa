@@ -107,6 +107,12 @@ Formatted with `deno fmt`.
 				});
 			}
 
+			$tw.rootWidget.addEventListener('tiddlypwa-init', (_evt) => {
+				const req = indexedDB.open(`tiddlypwa:${location.pathname}`, 1);
+				req.onupgradeneeded = (evt) => this.initDb(evt.target.result);
+				adb(req).then((_) => location.href = location.href);
+			});
+
 			$tw.rootWidget.addEventListener('tiddlypwa-remember', (_evt) => {
 				this.db.transaction('session', 'readwrite').objectStore('session').put({ key: this.key, mackey: this.mackey })
 					.onsuccess = (
@@ -253,16 +259,33 @@ Formatted with `deno fmt`.
 			return true;
 		}
 
+		initDb(db) {
+			db.createObjectStore('session', { autoIncrement: true });
+			db.createObjectStore('syncservers', { autoIncrement: true });
+			db.createObjectStore('tiddlers', { keyPath: 'thash' });
+		}
+
 		async _getStatus() {
 			if (!this.db) {
 				const req = indexedDB.open(`tiddlypwa:${location.pathname}`, 1);
 				req.onupgradeneeded = (evt) => {
 					const db = evt.target.result;
-					db.createObjectStore('session', { autoIncrement: true });
-					db.createObjectStore('syncservers', { autoIncrement: true });
-					db.createObjectStore('tiddlers', { keyPath: 'thash' });
+					const introtid = this.wiki.getTiddler('TiddlyPWA');
+					if (introtid && introtid.fields.tiddlypwa === 'noautodb') {
+						evt.target.transaction.abort();
+						return;
+					}
+					this.initDb(db);
 				};
-				this.db = await adb(req);
+				try {
+					this.db = await adb(req);
+				} catch (e) {
+					if (e.name === 'AbortError') {
+						this.wiki.addTiddler({ title: '$:/status/TiddlyPWADemoMode', text: 'yes' });
+						return;
+					}
+					throw e;
+				}
 			}
 			await this.reflectSyncServers();
 			await this.reflectStorageInfo();
@@ -325,6 +348,7 @@ Formatted with `deno fmt`.
 				await this.initialRead();
 			}
 			this.storyListHash = await this.titlehash('$:/StoryList');
+			this.wiki.deleteTiddler('TiddlyPWA');
 		}
 
 		getStatus(cb) {

@@ -25,7 +25,11 @@ Formatted with `deno fmt`.
 		}
 
 		save(_text, _method, _cb, _options) {
-			$tw.modal.display('$:/plugins/valpackett/tiddlypwa/save-dialog', {});
+			if ($tw.syncadaptor.isReady()) {
+				$tw.modal.display('$:/plugins/valpackett/tiddlypwa/save-dialog', {});
+			} else {
+				alert('No saving in TiddlyPWA installer/documentation mode!');
+			}
 			return true;
 		}
 	}
