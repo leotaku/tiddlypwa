@@ -83,6 +83,16 @@ Formatted with `deno fmt`.
 				$tw.syncer.syncFromServer(); // "server" being our local DB
 			};
 
+			this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: navigator.onLine ? 'yes' : 'no' });
+			window.addEventListener(
+				'offline',
+				(_evt) => this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: 'no' }),
+			);
+			window.addEventListener(
+				'online',
+				(_evt) => this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: 'yes' }),
+			);
+
 			// XXX: awful workaround for TW not refreshing the 'home' after the syncadaptor first loads $:/DefaultTiddlers
 			// (why is the timeout necessary?! without timeout we get a brief flash of the correct 'home' and then back to the file one o_0)
 			if (location.hash.length < 2) {
@@ -552,6 +562,7 @@ Formatted with `deno fmt`.
 		}
 
 		backgroundSync() {
+			if (!navigator.onLine) return;
 			// debounced to handle multiple saves in quick succession
 			clearTimeout(this.syncTimer);
 			this.syncTimer = setTimeout(() => this.sync(), 1000);

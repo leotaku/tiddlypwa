@@ -2,7 +2,26 @@ title: $:/plugins/valpackett/tiddlypwa/save-dialog
 
 !! Sync status
 
-TODO
+<table style="width:100%">
+<thead>
+    <tr>
+        <td>Server</td>
+        <td>Last successful sync</td>
+    </tr>
+</thead>
+<$list filter="[tag[$:/temp/TiddlyPWAServer]]">
+    <tr>
+        <td>{{!!url}}</td>
+        <td style="width:35%">{{!!lastSync}}</td>
+    </tr>
+</$list>
+</table>
+
+<$button message="tiddlypwa-sync">Sync now</$button>?
+
+<$reveal type="match" state="$:/status/TiddlyPWAOnline" text="no">
+(You are currently ''offline'', but the button is still available just in case.)
+</$reveal>
 
 !! Export as ordinary single-file ~TiddlyWiki
 
@@ -13,7 +32,7 @@ TODO
 To make a single-file backup of the wiki, you can {{$:/core/ui/Buttons/encryption}} &
 <$button>
 <$action-sendmessage $message="tm-download-file" publishFilter="-[prefix[$:/plugins/valpackett/tiddlypwa]]"/>
-save this wiki without !TiddlyPWA
+save this wiki without ~TiddlyPWA
 </$button>.
 
 Note that the native ~TiddlyWiki password that is configured via the button above will ''only''

@@ -37,11 +37,11 @@ The password (or technically, the encryption key derived from it) is currently
 
 This device syncs wiki contents with the following servers:
 
-<table>
+<table style="width:100%">
 <thead>
     <tr>
         <td>Server</td>
-        <td>Last sync</td>
+        <td>Last successful sync</td>
         <td></td>
     </tr>
 </thead>
