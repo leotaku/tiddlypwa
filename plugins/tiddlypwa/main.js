@@ -93,20 +93,6 @@ Formatted with `deno fmt`.
 				(_evt) => this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: 'yes' }),
 			);
 
-			// XXX: awful workaround for TW not refreshing the 'home' after the syncadaptor first loads $:/DefaultTiddlers
-			// (why is the timeout necessary?! without timeout we get a brief flash of the correct 'home' and then back to the file one o_0)
-			if (location.hash.length < 2) {
-				let didHome = false;
-				this.wiki.addEventListener('change', (chg) => {
-					if (
-						!didHome && this.isReady() && '$:/DefaultTiddlers' in chg && this.wiki.getTiddlerText('$:/DefaultTiddlers')
-					) {
-						setTimeout(() => $tw.rootWidget.dispatchEvent({ type: 'tm-home' }), 100);
-						didHome = true;
-					}
-				});
-			}
-
 			$tw.rootWidget.addEventListener('tiddlypwa-init', (_evt) => {
 				const req = indexedDB.open(`tiddlypwa:${location.pathname}`, 1);
 				req.onupgradeneeded = (evt) => this.initDb(evt.target.result);
@@ -417,6 +403,10 @@ Formatted with `deno fmt`.
 		}
 
 		saveTiddler(tiddler, cb) {
+			if (tiddler.fields.title === '$:/StoryList' && !this.loadedStoryList) {
+				// Avoid saving the pre-DB-open StoryList!
+				return cb(null, '', 1);
+			}
 			this._saveTiddler(tiddler).then((_) => {
 				cb(null, '', 1);
 				this.changesChannel.postMessage({ title: tiddler.fields.title });
@@ -425,6 +415,7 @@ Formatted with `deno fmt`.
 		}
 
 		async _loadTiddler(title) {
+			if (title === '$:/StoryList') this.loadedStoryList = true;
 			const thash = await this.titlehash(title);
 			const obj = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').get(thash));
 			const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.iv }, this.key, obj.data);
