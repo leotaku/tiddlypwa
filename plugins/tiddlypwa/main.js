@@ -53,6 +53,13 @@ Formatted with `deno fmt`.
 		return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)).buffer;
 	}
 
+	function formatBytes(bytes) {
+		const sizes = ['bytes', '~KiB', '~MiB', '~GiB', '~TiB'];
+		const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+		if (i >= sizes.length) return 'too much';
+		return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+	}
+
 	function arrayEq(a, b) {
 		const av = new Uint8Array(a);
 		const bv = new Uint8Array(b);
@@ -109,6 +116,10 @@ Formatted with `deno fmt`.
 					}
 				};
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: 'no' });
+			});
+
+			$tw.rootWidget.addEventListener('tiddlypwa-enable-persistence', (_evt) => {
+				navigator.storage.persist().then(() => this.reflectStorageInfo());
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-add-sync-server', (evt) => {
@@ -175,6 +186,23 @@ Formatted with `deno fmt`.
 			);
 		}
 
+		async reflectStorageInfo() {
+			this.wiki.addTiddler({
+				title: '$:/status/TiddlyPWAStoragePersisted',
+				text: (navigator.storage && navigator.storage.persist)
+					? (await navigator.storage.persisted() ? 'yes' : 'no')
+					: 'unavail',
+			});
+			const formatEstimate = ({ usage, quota }) =>
+				`${formatBytes(usage)} of ${formatBytes(quota)} (${(usage / quota * 100).toFixed(2)}%)`;
+			this.wiki.addTiddler({
+				title: '$:/status/TiddlyPWAStorageQuota',
+				text: (navigator.storage && navigator.storage.estimate)
+					? formatEstimate(await navigator.storage.estimate())
+					: 'unavail',
+			});
+		}
+
 		isReady() {
 			return !!(this.db && this.key);
 		}
@@ -229,6 +257,7 @@ Formatted with `deno fmt`.
 				this.db = await adb(req);
 			}
 			await this.reflectSyncServers();
+			await this.reflectStorageInfo();
 			if (!this.key) {
 				const ses = await adb(this.db.transaction('session').objectStore('session').getAll());
 				if (ses.length > 0) {
@@ -352,6 +381,7 @@ Formatted with `deno fmt`.
 					mtime: tiddler.fields.modified || new Date(), // Has to be unencrypted for sync conflict resolution
 				}),
 			);
+			await this.reflectStorageInfo();
 		}
 
 		saveTiddler(tiddler, cb) {
@@ -388,6 +418,7 @@ Formatted with `deno fmt`.
 					mtime: new Date(),
 				}),
 			);
+			await this.reflectStorageInfo();
 		}
 
 		deleteTiddler(title, cb, _options) {
@@ -516,6 +547,7 @@ Formatted with `deno fmt`.
 			}
 			$tw.syncer.syncFromServer(); // "server" being our local DB that we just updated, actually
 			await this.reflectSyncServers();
+			await this.reflectStorageInfo();
 			this.isSyncing = false;
 		}
 
