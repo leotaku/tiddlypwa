@@ -508,6 +508,7 @@ Formatted with `deno fmt`.
 			}
 			const { serverChanges } = await resp.json();
 			const titlesToRead = [];
+			const titleHashesToDelete = new Set();
 			const txn = this.db.transaction('tiddlers', 'readwrite');
 			for (const { thash, title, tiv, dhash, data, iv, mtime, deleted } of serverChanges) {
 				if (arrayEq(b64dec(thash), this.storyListHash)) continue;
@@ -532,9 +533,14 @@ Formatted with `deno fmt`.
 				}
 				txn.objectStore('tiddlers').put(tid);
 				if (deleted) {
-					// TODO: find title by hash in loaded tiddlers
+					titleHashesToDelete.add(thash);
 				} else {
 					titlesToRead.push({ title: tid.title, iv: tid.tiv });
+				}
+			}
+			for (const title of $tw.wiki.allTitles()) {
+				if (titleHashesToDelete.has(await b64enc(await this.titlehash(title)))) {
+					this.deletedQueue.add(title);
 				}
 			}
 			for (const { title, iv } of titlesToRead) {
