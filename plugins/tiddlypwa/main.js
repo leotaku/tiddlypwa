@@ -408,9 +408,10 @@ Formatted with `deno fmt`.
 				return cb(null, '', 1);
 			}
 			this._saveTiddler(tiddler).then((_) => {
+				const now = new Date();
 				cb(null, '', 1);
 				this.changesChannel.postMessage({ title: tiddler.fields.title });
-				this.backgroundSync();
+				this.backgroundSync(now);
 			}).catch((e) => cb(e));
 		}
 
@@ -446,14 +447,14 @@ Formatted with `deno fmt`.
 
 		deleteTiddler(title, cb, _options) {
 			this._deleteTiddler(title).then((_) => {
+				const now = new Date();
 				cb(null);
 				this.changesChannel.postMessage({ title, del: true });
-				this.backgroundSync();
+				this.backgroundSync(now);
 			}).catch((e) => cb(e));
 		}
 
-		async _sync({ url, token, lastSync }) {
-			const now = new Date();
+		async _sync({ url, token, lastSync }, now = new Date()) {
 			this.logger.log('sync started', url, lastSync, now);
 			const changes = [];
 			await new Promise((resolve) =>
@@ -544,7 +545,7 @@ Formatted with `deno fmt`.
 			return now;
 		}
 
-		async sync() {
+		async sync(now) {
 			if (this.isSyncing) {
 				return;
 			}
@@ -563,7 +564,7 @@ Formatted with `deno fmt`.
 			);
 			for (const [key, server] of servers) {
 				try {
-					server.lastSync = await this._sync(server);
+					server.lastSync = await this._sync(server, now);
 					await adb(this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put(server, key));
 				} catch (e) {
 					this.logger.alert(`Could not sync with server "${server.url}"!`, e);
@@ -576,11 +577,11 @@ Formatted with `deno fmt`.
 			this.isSyncing = false;
 		}
 
-		backgroundSync() {
+		backgroundSync(now) {
 			if (!navigator.onLine) return;
 			// debounced to handle multiple saves in quick succession
 			clearTimeout(this.syncTimer);
-			this.syncTimer = setTimeout(() => this.sync(), 1000);
+			this.syncTimer = setTimeout(() => this.sync(now), 1000);
 		}
 	}
 
