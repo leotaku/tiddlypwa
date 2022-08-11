@@ -157,8 +157,12 @@ Formatted with `deno fmt`.
 				});
 			});
 
+			$tw.rootWidget.addEventListener('tiddlypwa-sync-all', (_evt) => {
+				this.sync(true);
+			});
+
 			$tw.rootWidget.addEventListener('tiddlypwa-sync', (_evt) => {
-				this.sync();
+				this.sync(false);
 			});
 		}
 
@@ -454,8 +458,8 @@ Formatted with `deno fmt`.
 			}).catch((e) => cb(e));
 		}
 
-		async _sync({ url, token, lastSync }, now = new Date()) {
-			this.logger.log('sync started', url, lastSync, now);
+		async _sync({ url, token, lastSync }, all = false, now = new Date()) {
+			this.logger.log('sync started', url, lastSync, all, now);
 			const changes = [];
 			await new Promise((resolve) =>
 				this.db.transaction('tiddlers', 'readwrite').objectStore('tiddlers').openCursor().onsuccess = (evt) => {
@@ -463,7 +467,7 @@ Formatted with `deno fmt`.
 					if (!cursor) {
 						return resolve();
 					}
-					if (cursor.value.mtime > lastSync) {
+					if (all || cursor.value.mtime > lastSync) {
 						changes.push(cursor.value);
 					}
 					cursor.continue();
@@ -545,7 +549,7 @@ Formatted with `deno fmt`.
 			return now;
 		}
 
-		async sync(now) {
+		async sync(all, now) {
 			if (this.isSyncing) {
 				return;
 			}
@@ -564,7 +568,7 @@ Formatted with `deno fmt`.
 			);
 			for (const [key, server] of servers) {
 				try {
-					server.lastSync = await this._sync(server, now);
+					server.lastSync = await this._sync(server, all, now);
 					await adb(this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put(server, key));
 				} catch (e) {
 					this.logger.alert(`Could not sync with server "${server.url}"!`, e);
@@ -581,7 +585,7 @@ Formatted with `deno fmt`.
 			if (!navigator.onLine) return;
 			// debounced to handle multiple saves in quick succession
 			clearTimeout(this.syncTimer);
-			this.syncTimer = setTimeout(() => this.sync(now), 1000);
+			this.syncTimer = setTimeout(() => this.sync(false, now), 1000);
 		}
 	}
 
