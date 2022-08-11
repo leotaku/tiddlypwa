@@ -75,6 +75,7 @@ Formatted with `deno fmt`.
 			this.deletedQueue = new Set();
 			this.changesChannel = new BroadcastChannel('changed-tiddlers');
 			this.changesChannel.onmessage = (evt) => {
+				if (evt.data.title === '$:/StoryList') return; // don't mess with viewing different things in multiple tabs
 				if (evt.data.del) {
 					this.deletedQueue.add(evt.data.title);
 				} else {
