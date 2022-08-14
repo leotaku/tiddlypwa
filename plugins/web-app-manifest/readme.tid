@@ -18,7 +18,7 @@ The manifest file must be referenced from the file's `<head>` like so:
 The `name` is taken from [[$:/plugins/valpackett/web-app-manifest/name]], which by default just includes the wiki's title.
 
 Colors are taken from [[$:/plugins/valpackett/web-app-manifest/background-color]] and
-[[$:/plugins/valpackett/web-app-manifest/theme-color]], which by default take the current pallette's colors.
+[[$:/plugins/valpackett/web-app-manifest/theme-color]], which by default take the current palette's colors.
 
 Icons are collected from tiddlers tagged with `$:/tags/ManifestIcon`, but if none have that tag, [[$:/favicon.ico]] is chosen if it exists.
 (Obviously you can add the tag to [[$:/favicon.ico]] if you want to use it //and// others.)
