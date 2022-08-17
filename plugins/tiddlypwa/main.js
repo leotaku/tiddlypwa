@@ -72,7 +72,7 @@ Formatted with `deno fmt`.
 			this.logger = new $tw.utils.Logger('tiddlypwa-storage');
 			this.modifiedQueue = new Set();
 			this.deletedQueue = new Set();
-			this.changesChannel = new BroadcastChannel('changed-tiddlers');
+			this.changesChannel = new BroadcastChannel(`tiddlypwa-changes:${location.pathname}`);
 			this.changesChannel.onmessage = (evt) => {
 				if (evt.data.title === '$:/StoryList') return; // don't mess with viewing different things in multiple tabs
 				if (evt.data.del) {
