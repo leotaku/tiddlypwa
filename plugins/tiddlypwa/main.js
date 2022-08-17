@@ -212,6 +212,7 @@ Formatted with `deno fmt`.
 		}
 
 		async initialRead() {
+			this.storyListHash = await this.titlehash('$:/StoryList');
 			const titlesToRead = [];
 			await new Promise((resolve) => {
 				this.db.transaction('tiddlers').objectStore('tiddlers').openCursor().onsuccess = (evt) => {
@@ -219,18 +220,21 @@ Formatted with `deno fmt`.
 					if (!cursor) {
 						return resolve(true);
 					}
-					const { title, tiv, deleted } = cursor.value;
-					titlesToRead.push({ title, tiv, deleted });
+					const { thash, title, tiv, deleted } = cursor.value;
+					titlesToRead.push({ thash, title, tiv, deleted });
 					cursor.continue();
 				};
 			});
 			if (titlesToRead.length === 0) {
 				$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-newwiki');
 				$tw.wiki.addToStory('$:/ControlPanel');
+				this.loadedStoryList = true; // not truly "loaded" but as in "enable saving it to the DB"
 				return true;
 			}
-			for (const { title, tiv, deleted } of titlesToRead) {
+			let hasStoryList = false;
+			for (const { thash, title, tiv, deleted } of titlesToRead) {
 				try {
+					if (arrayEq(thash, this.storyListHash)) hasStoryList = true;
 					if (deleted) {
 						continue;
 					}
@@ -245,6 +249,9 @@ Formatted with `deno fmt`.
 					$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-badpass');
 					return false;
 				}
+			}
+			if (!hasStoryList) {
+				this.loadedStoryList = true; // not truly "loaded" but as in "enable saving it to the DB"
 			}
 			return true;
 		}
@@ -337,7 +344,6 @@ Formatted with `deno fmt`.
 			} else {
 				await this.initialRead();
 			}
-			this.storyListHash = await this.titlehash('$:/StoryList');
 			this.wiki.deleteTiddler('TiddlyPWA');
 		}
 
