@@ -9,9 +9,7 @@ Formatted with `deno fmt`.
 (function () {
 	'use strict';
 
-	if (!$tw.browser || document.documentElement.hasAttribute('tiddlypwa-install')) {
-		return;
-	}
+	if (!$tw.browser) return;
 
 	class PWASaver {
 		info = {

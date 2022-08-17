@@ -9,9 +9,8 @@ Formatted with `deno fmt`.
 (function () {
 	'use strict';
 
-	if (!$tw.browser || location.protocol === 'file:' || document.documentElement.hasAttribute('tiddlypwa-install')) {
-		return;
-	}
+	if (!$tw.browser) return;
+
 	if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
 		alert('Warning! TiddlyPWA must be served over HTTPS.');
 	}
