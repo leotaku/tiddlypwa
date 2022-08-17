@@ -17,7 +17,7 @@ title: $:/plugins/valpackett/tiddlypwa/save-dialog
 </$list>
 </table>
 
-<$reveal type="match" state="$:/status/TiddlyPWASyncing" text="no">
+<$reveal type="nomatch" state="$:/status/TiddlyPWASyncing" text="yes">
 <$button message="tiddlypwa-sync">Sync now</$button>?
 (Advanced: try <$button message="tiddlypwa-sync-all">sync with all contents now</$button> if there are somehow changes that aren't being saved on the server.)
 </$reveal>
