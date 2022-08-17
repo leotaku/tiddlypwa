@@ -87,6 +87,10 @@ Formatted with `deno fmt`.
 			this.serversChannel.onmessage = (_evt) => {
 				this.reflectSyncServers();
 			};
+			this.sessionChannel = new BroadcastChannel(`tiddlypwa-session:${location.pathname}`);
+			this.sessionChannel.onmessage = (evt) => {
+				this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: evt.data ? 'yes' : 'no' });
+			};
 
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: navigator.onLine ? 'yes' : 'no' });
 			window.addEventListener(
@@ -111,6 +115,7 @@ Formatted with `deno fmt`.
 					) => {
 						this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: 'yes' });
 						$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-remembered');
+						this.sessionChannel.postMessage(true);
 					};
 			});
 
@@ -123,6 +128,7 @@ Formatted with `deno fmt`.
 					}
 				};
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: 'no' });
+				this.sessionChannel.postMessage(false);
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-enable-persistence', (_evt) => {
