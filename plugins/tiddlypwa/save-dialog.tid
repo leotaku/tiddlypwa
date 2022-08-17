@@ -37,7 +37,7 @@ Sync in progress.
 
 To make a single-file backup of the wiki, you can {{$:/core/ui/Buttons/encryption}} &
 <$button>
-<$action-sendmessage $message="tm-download-file" publishFilter="-[prefix[$:/HistoryList]] -[prefix[$:/StoryList]] -[status[pending]plugin-type[import]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/status/]] -[prefix[$:/temp/]] -[prefix[$:/plugins/valpackett/tiddlypwa]]"/>
+<$action-sendmessage $message="tm-download-file" publishFilter="-[[$:/HistoryList]] -[[$:/StoryList]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/status/]] -[prefix[$:/temp/]] -[prefix[$:/plugins/valpackett/tiddlypwa]]"/>
 save this wiki without ~TiddlyPWA
 </$button>.
 
@@ -46,5 +46,17 @@ apply to files saved via this save button — it is completely independent of th
 
 !! Export as ~TiddlyPWA app HTML
 
-TODO:
-save this wiki without the content
+<$reveal type="match" state="$:/isEncrypted" text="yes">
+~TiddlyWiki single-file password must not be used when doing this, please unset it using the "clear password" button above.
+</$reveal>
+<$reveal type="nomatch" state="$:/isEncrypted" text="yes">
+
+To update the wiki file that is used as the ~TiddlyPWA application (for example to install plugins), you can
+<$button>
+<$action-sendmessage $message="tm-download-file" publishFilter="-[is[tiddler]] [[$:/core]] [[$:/favicon.ico]] [[$:/SiteTitle]] [[$:/SiteSubtitle]] [[$:/language]] [[$:/theme]] [[$:/palette]] [prefix[$:/themes/]] [prefix[$:/plugins/]]"/>
+save this wiki without content
+</$button>.
+
+Note that some basic configuration like the title, subtitle, favicon, theme and palette will be saved unencrypted.
+
+</$reveal>
