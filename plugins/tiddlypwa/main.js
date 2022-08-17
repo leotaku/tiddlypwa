@@ -474,7 +474,7 @@ Formatted with `deno fmt`.
 			}).catch((e) => cb(e));
 		}
 
-		async _sync({ url, token, lastSync }, all = false, now = new Date()) {
+		async _syncOneUnlocked({ url, token, lastSync }, all = false, now = new Date()) {
 			this.logger.log('sync started', url, lastSync, all, now);
 			const changes = [];
 			await new Promise((resolve) =>
@@ -571,12 +571,7 @@ Formatted with `deno fmt`.
 			return now;
 		}
 
-		async sync(all, now) {
-			if (this.isSyncing) {
-				return;
-			}
-			this.isSyncing = true;
-			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncing', text: 'yes' });
+		async _syncManyUnlocked(all, now) {
 			const servers = [];
 			await new Promise((resolve) =>
 				this.db.transaction('syncservers').objectStore('syncservers').openCursor().onsuccess = (evt) => {
@@ -590,7 +585,7 @@ Formatted with `deno fmt`.
 			);
 			for (const [key, server] of servers) {
 				try {
-					server.lastSync = await this._sync(server, all, now);
+					server.lastSync = await this._syncOneUnlocked(server, all, now);
 					await adb(this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put(server, key));
 				} catch (e) {
 					this.logger.alert(`Could not sync with server "${server.url}"!`, e);
@@ -601,6 +596,19 @@ Formatted with `deno fmt`.
 			await this.reflectStorageInfo();
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncing', text: 'no' });
 			this.isSyncing = false;
+		}
+
+		sync(all, now) {
+			if (this.isSyncing) {
+				return;
+			}
+			this.isSyncing = true;
+			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncing', text: 'yes' });
+			if (!navigator.locks) {
+				// welp, using multiple tabs without Web Locks is dangerous, but we can only YOLO it in this case
+				return this._syncManyUnlocked(all, now);
+			}
+			return navigator.locks.request(`tiddlypwa:${location.pathname}`, (_lck) => this._syncManyUnlocked(all, now));
 		}
 
 		backgroundSync(now) {
