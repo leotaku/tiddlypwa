@@ -61,7 +61,9 @@ Formatted with `deno fmt`.
 					manifest.icons.push(parseIconTiddler(x));
 				}
 			}
-			link.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/json' }));
+			const json = JSON.stringify(manifest);
+			link.href = URL.createObjectURL(new Blob([json], { type: 'application/manifest+json' }));
+			$tw.__tiddlypwa_manifest__ = json;
 		}
 
 		render();
