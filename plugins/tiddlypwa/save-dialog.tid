@@ -51,7 +51,7 @@ apply to files saved via this save button — it is completely independent of th
 </$reveal>
 <$reveal type="nomatch" state="$:/isEncrypted" text="yes">
 
-To update the wiki file that is used as the ~TiddlyPWA application (for example to install plugins), you can
+To update the wiki file that is used as the ~TiddlyPWA application (for example to install plugins/themes), you can
 <$button>
 <$action-sendmessage $message="tm-download-file" publishFilter="-[is[tiddler]] [[$:/core]] [[$:/favicon.ico]] [[$:/SiteTitle]] [[$:/SiteSubtitle]] [[$:/language]] [[$:/theme]] [[$:/palette]] [prefix[$:/themes/]] [prefix[$:/plugins/]]"/>
 save this wiki without content

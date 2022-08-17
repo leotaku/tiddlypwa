@@ -417,6 +417,16 @@ Formatted with `deno fmt`.
 				// Avoid saving the pre-DB-open StoryList!
 				return cb(null, '', 1);
 			}
+			if (tiddler.fields.title === '$:/Import') {
+				// For some reason this is not in the default $:/config/SyncFilter but no one would want this actually stored.
+				return cb(null, '', 1);
+			}
+			if (tiddler.fields.title.startsWith('$:/themes/') || tiddler.fields.title.startsWith('$:/plugins/')) {
+				// Those should go into the saved wiki file.
+				// Attempting to only direct the `doesPluginRequireReload` ones into the file does not seem worth it.
+				// By ignoring the callback we make TW think there's something unsaved now, which there is!
+				return;
+			}
 			this._saveTiddler(tiddler).then((_) => {
 				const now = new Date();
 				cb(null, '', 1);
