@@ -81,6 +81,11 @@ Formatted with `deno fmt`.
 					this.modifiedQueue.add(evt.data.title);
 				}
 				$tw.syncer.syncFromServer(); // "server" being our local DB
+				this.reflectStorageInfo();
+			};
+			this.serversChannel = new BroadcastChannel(`tiddlypwa-servers:${location.pathname}`);
+			this.serversChannel.onmessage = (_evt) => {
+				this.reflectSyncServers();
 			};
 
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: navigator.onLine ? 'yes' : 'no' });
@@ -143,7 +148,10 @@ Formatted with `deno fmt`.
 						token,
 						lastSync: new Date(0),
 					}),
-				).then((_e) => this.reflectSyncServers()).catch((e) => {
+				).then((_x) => {
+					this.reflectSyncServers();
+					this.serversChannel.postMessage(true);
+				}).catch((e) => {
 					this.logger.alert('Failed to save the sync server!', e);
 				});
 			});
@@ -152,7 +160,10 @@ Formatted with `deno fmt`.
 				const key = evt && evt.paramObject && evt.paramObject.key;
 				adb(
 					this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').delete(parseInt(key)),
-				).then((_e) => this.reflectSyncServers()).catch((e) => {
+				).then((_x) => {
+					this.reflectSyncServers();
+					this.serversChannel.postMessage(true);
+				}).catch((e) => {
 					this.logger.alert('Failed to delete the sync server!', e);
 				});
 			});
