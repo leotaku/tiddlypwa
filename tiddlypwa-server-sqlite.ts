@@ -19,7 +19,9 @@ if (dbver < 1) {
 			id INTEGER PRIMARY KEY,
 			token TEXT NOT NULL,
 			apphtml BLOB,
-			swjs BLOB
+			apphtmletag BLOB,
+			swjs BLOB,
+			swjsetag BLOB
 		) STRICT;
 		CREATE TABLE tiddlers (
 			thash BLOB PRIMARY KEY NOT NULL,
@@ -43,11 +45,11 @@ const wikiIdQuery = db.prepareQuery<number>(`
 `);
 
 const apphtmlQuery = db.prepareQuery<string>(`
-	SELECT apphtml FROM wikis WHERE token LIKE :halftoken || '%'
+	SELECT apphtml, apphtmletag FROM wikis WHERE token LIKE :halftoken || '%'
 `);
 
 const swjsQuery = db.prepareQuery<string>(`
-	SELECT swjs FROM wikis WHERE token LIKE :halftoken || '%'
+	SELECT swjs, swjsetag FROM wikis WHERE token LIKE :halftoken || '%'
 `);
 
 const changedQuery = db.prepareQuery<
@@ -157,15 +159,27 @@ function handleDelete({ atoken, token }: { atoken: any; token: any }) {
 	return Response.json({}, { headers: respHdrs, status: 200 });
 }
 
-function handleUploadApp({ token, apphtml, swjs }: { token: any; apphtml: any; swjs: any }) {
+async function handleUploadApp({ token, apphtml, swjs }: { token: any; apphtml: any; swjs: any }) {
 	if (typeof token !== 'string' || typeof apphtml !== 'string' || typeof swjs !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	db.query(`UPDATE wikis SET apphtml = :apphtml, swjs = :swjs WHERE token = :token`, {
-		token,
-		apphtml: brotli.compress(utfenc.encode(apphtml), 4096, 8),
-		swjs: brotli.compress(utfenc.encode(swjs), 4096, 8),
-	});
+	const apphtmlutf = utfenc.encode(apphtml);
+	const swjsutf = utfenc.encode(swjs);
+	db.query(
+		`UPDATE wikis SET
+		apphtml = :apphtml,
+		apphtmletag = :apphtmletag,
+		swjs = :swjs,
+		swjsetag = :swjsetag
+		WHERE token = :token`,
+		{
+			token,
+			apphtml: brotli.compress(apphtmlutf, 4096, 8),
+			apphtmletag: new Uint8Array(await crypto.subtle.digest('SHA-1', apphtmlutf)),
+			swjs: brotli.compress(swjsutf, 4096, 8),
+			swjsetag: new Uint8Array(await crypto.subtle.digest('SHA-1', swjsutf)),
+		},
+	);
 	return Response.json({ url: token.slice(0, token.length / 2) + '/app.html' }, { headers: respHdrs, status: 200 });
 }
 
@@ -178,24 +192,39 @@ function handleDbFile(pattern: URLPattern, req: Request, query: any, ctype: stri
 	if (res.length === 0) {
 		return Response.json({}, { status: 404 });
 	}
-	if (req.headers.get('accept-encoding')?.split(',').find((x) => x.trim().split(';')[0] === 'br')) {
-		return new Response(res[0][0], {
+	const supportsBrotli = req.headers.get('accept-encoding')?.split(',').find((x) => x.trim().split(';')[0] === 'br');
+	const [body, etag] = res[0];
+	const etagstr = '"' + base64.encode(etag) + (supportsBrotli ? '-b' : '-x') + '"';
+	// if we decomress and Deno recompresses to something else (gzip) it'll mark the ETag as a weak validator
+	const commonHeaders = {
+		'content-type': ctype,
+		'vary': 'Accept-Encoding',
+		'cache-control': 'no-cache',
+		'etag': etagstr,
+	};
+	if (req.headers.get('if-none-match') === etagstr) {
+		return new Response(null, {
+			status: 304,
+			headers: commonHeaders,
+		});
+	}
+	if (supportsBrotli) {
+		return new Response(body, {
 			headers: {
-				'content-type': ctype,
+				...commonHeaders,
 				'content-encoding': 'br',
-				'vary': 'Accept-Encoding',
 			},
 		});
 	}
-	return new Response(brotli.decompress(res[0][0]), {
-		headers: { 'content-type': ctype },
+	return new Response(brotli.decompress(body), {
+		headers: commonHeaders,
 	});
 }
 
 async function handle(req: Request) {
 	if (req.method === 'GET') {
-		return handleDbFile(apphtmlPat, req, apphtmlQuery, 'text/html;charset=utf-8') ||
-			handleDbFile(swjsPat, req, swjsQuery, 'text/javascript;charset=utf-8') || serveDir(req, {
+		return await handleDbFile(apphtmlPat, req, apphtmlQuery, 'text/html;charset=utf-8') ||
+			await handleDbFile(swjsPat, req, swjsQuery, 'text/javascript;charset=utf-8') || serveDir(req, {
 				fsRoot: staticdir,
 			});
 	}
