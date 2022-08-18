@@ -2,12 +2,14 @@ import { serveListener } from 'https://deno.land/std@0.150.0/http/server.ts';
 import { serveDir } from 'https://deno.land/std@0.150.0/http/file_server.ts';
 import { parse as argparse } from 'https://deno.land/std@0.150.0/flags/mod.ts';
 import * as base64 from 'https://deno.land/std@0.150.0/encoding/base64.ts';
+import * as brotli from 'https://deno.land/x/brotli@v0.1.4/mod.ts';
 import { DB } from 'https://deno.land/x/sqlite@v3.4.0/mod.ts';
 
 const args = argparse(Deno.args);
 const admintoken = args.admintoken || Deno.env.get('ADMIN_TOKEN');
 const staticdir = args.static || Deno.env.get('STATIC_DIR') || 'static';
 const db = new DB(args.db || Deno.env.get('SQLITE_DB') || '.data/tiddly.db');
+const utfenc = new TextEncoder();
 
 const dbver = db.query('PRAGMA user_version')[0][0] as number;
 if (dbver < 1) {
@@ -16,8 +18,8 @@ if (dbver < 1) {
 		CREATE TABLE wikis (
 			id INTEGER PRIMARY KEY,
 			token TEXT NOT NULL,
-			apphtml TEXT,
-			swjs TEXT
+			apphtml BLOB,
+			swjs BLOB
 		) STRICT;
 		CREATE TABLE tiddlers (
 			thash BLOB PRIMARY KEY NOT NULL,
@@ -159,12 +161,16 @@ function handleUploadApp({ token, apphtml, swjs }: { token: any; apphtml: any; s
 	if (typeof token !== 'string' || typeof apphtml !== 'string' || typeof swjs !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	db.query(`UPDATE wikis SET apphtml = :apphtml, swjs = :swjs WHERE token = :token`, { token, apphtml, swjs });
+	db.query(`UPDATE wikis SET apphtml = :apphtml, swjs = :swjs WHERE token = :token`, {
+		token,
+		apphtml: brotli.compress(utfenc.encode(apphtml), 4096, 8),
+		swjs: brotli.compress(utfenc.encode(swjs), 4096, 8),
+	});
 	return Response.json({ url: token.slice(0, token.length / 2) + '/app.html' }, { headers: respHdrs, status: 200 });
 }
 
-function handleDbFile(pattern: URLPattern, url: string, query: any, ctype: string): Response | null {
-	const match = pattern.exec(url);
+function handleDbFile(pattern: URLPattern, req: Request, query: any, ctype: string): Response | null {
+	const match = pattern.exec(req.url);
 	if (!match) {
 		return null;
 	}
@@ -172,13 +178,24 @@ function handleDbFile(pattern: URLPattern, url: string, query: any, ctype: strin
 	if (res.length === 0) {
 		return Response.json({}, { status: 404 });
 	}
-	return new Response(res[0][0], { headers: { 'content-type': ctype } });
+	if (req.headers.get('accept-encoding')?.split(',').find((x) => x.trim().split(';')[0] === 'br')) {
+		return new Response(res[0][0], {
+			headers: {
+				'content-type': ctype,
+				'content-encoding': 'br',
+				'vary': 'Accept-Encoding',
+			},
+		});
+	}
+	return new Response(brotli.decompress(res[0][0]), {
+		headers: { 'content-type': ctype },
+	});
 }
 
 async function handle(req: Request) {
 	if (req.method === 'GET') {
-		return handleDbFile(apphtmlPat, req.url, apphtmlQuery, 'text/html;charset=utf-8') ||
-			handleDbFile(swjsPat, req.url, swjsQuery, 'text/javascript;charset=utf-8') || serveDir(req, {
+		return handleDbFile(apphtmlPat, req, apphtmlQuery, 'text/html;charset=utf-8') ||
+			handleDbFile(swjsPat, req, swjsQuery, 'text/javascript;charset=utf-8') || serveDir(req, {
 				fsRoot: staticdir,
 			});
 	}
