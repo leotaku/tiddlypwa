@@ -174,6 +174,17 @@ Formatted with `deno fmt`.
 				});
 			});
 
+			$tw.rootWidget.addEventListener('tiddlypwa-upload-app-wiki', (evt) => {
+				this.uploadAppWiki(evt.paramObject);
+			});
+
+			$tw.rootWidget.addEventListener('tiddlypwa-browser-refresh', (_evt) => {
+				$tw.syncer.isDirty = function () {
+					return false;
+				}; // skip the onbeforeunload
+				location.reload(); // tm-browser-refresh passes 'true' which skips the serviceworker. silly!
+			});
+
 			$tw.rootWidget.addEventListener('tiddlypwa-sync-all', (_evt) => {
 				this.sync(true);
 			});
@@ -489,6 +500,69 @@ Formatted with `deno fmt`.
 				this.changesChannel.postMessage({ title, del: true });
 				this.backgroundSync(now);
 			}).catch((e) => cb(e));
+		}
+
+		async uploadAppWiki(variables) {
+			this.wiki.addTiddler({ title: '$:/status/TiddlyPWAUploadResult', text: 'Upload in progress.' });
+			this.wiki.addTiddler({ title: '$:/status/TiddlyPWAUploading', text: 'yes' });
+			const apphtml = $tw.wiki.renderTiddler(
+				'text/plain',
+				$tw.wiki.getTiddlerText('$:/config/SaveWikiButton/Template', '$:/core/save/all'),
+				{ variables },
+			);
+			const swjs = $tw.wiki.renderTiddler('text/plain', '$:/plugins/valpackett/tiddlypwa-offline/sw.js', {});
+			try {
+				const servers = await adb(
+					this.db.transaction('syncservers').objectStore('syncservers').getAll(),
+				);
+				const resps = await Promise.all(servers.map(({ url, token }) =>
+					fetch(url, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({ tiddlypwa: 1, op: 'uploadapp', token, apphtml, swjs }),
+					}).then((resp) => [url, resp])
+				));
+				const urls = [];
+				for (const [url, resp] of resps) {
+					if (!resp.ok) {
+						try {
+							const { error } = await resp.json();
+							urls.push(`${url}: ${knownErrors[error] || error}`);
+						} catch (_e) {
+							urls.push(`${url}: Server returned error ${resp.status}`);
+						}
+						continue;
+					}
+					const href = new URL((await resp.json()).url, url).href;
+					const isCurrent = href === document.location.href;
+					urls.push(
+						href + (isCurrent ? ' {{$:/plugins/valpackett/tiddlypwa/cur-page-reload}}' : ''),
+					);
+					if (isCurrent) {
+						// This makes sure we instantly reload into the new version!
+						// The ServiceWorker will refetch from the server in the background again,
+						// so this should not cause any trouble. E.g. a concurrent update that
+						// happened in between upload and refresh would arrive as a new refresh prompt.
+						try {
+							const cache = await caches.open('tiddlypwa');
+							for (const req of await cache.keys()) {
+								if (req.url === href) {
+									cache.put(req, new Response(apphtml, { headers: { 'content-type': 'text/html;charset=utf-8' } }));
+								}
+							}
+						} catch (e) {
+							this.logger.alert('Failed to update local cache!', e);
+						}
+					}
+				}
+				this.wiki.addTiddler({ title: '$:/status/TiddlyPWAUploadResult', text: 'Uploaded:\n\n* ' + urls.join('\n* ') });
+			} catch (e) {
+				this.wiki.addTiddler({ title: '$:/status/TiddlyPWAUploadResult', text: 'Upload error: ' + e });
+			} finally {
+				this.wiki.addTiddler({ title: '$:/status/TiddlyPWAUploading', text: 'no' });
+			}
 		}
 
 		async _syncOneUnlocked({ url, token, lastSync }, all = false, now = new Date()) {

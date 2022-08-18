@@ -55,7 +55,16 @@ To update the wiki file that is used as the ~TiddlyPWA application (for example 
 <$button>
 <$action-sendmessage $message="tm-download-file" publishFilter="-[is[tiddler]] [[$:/core]] [[$:/favicon.ico]] [[$:/SiteTitle]] [[$:/SiteSubtitle]] [[$:/language]] [[$:/theme]] [[$:/palette]] [prefix[$:/themes/]] [prefix[$:/plugins/]]"/>
 save this wiki without content
-</$button>.
+</$button>
+<$reveal type="nomatch" state="$:/status/TiddlyPWAUploading" text="yes">
+or directly
+<$button>
+<$action-sendmessage $message="tiddlypwa-upload-app-wiki" publishFilter="-[is[tiddler]] [[$:/core]] [[$:/favicon.ico]] [[$:/SiteTitle]] [[$:/SiteSubtitle]] [[$:/language]] [[$:/theme]] [[$:/palette]] [prefix[$:/themes/]] [prefix[$:/plugins/]]"/>
+upload it to sync servers
+</$button>
+</$reveal>!
+
+{{$:/status/TiddlyPWAUploadResult}}
 
 Note that some basic configuration like the title, subtitle, favicon, theme and palette will be saved unencrypted.
 
