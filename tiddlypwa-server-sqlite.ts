@@ -6,6 +6,7 @@ import { DB } from 'https://deno.land/x/sqlite@v3.4.0/mod.ts';
 
 const args = argparse(Deno.args);
 const admintoken = args.admintoken || Deno.env.get('ADMIN_TOKEN');
+const staticdir = args.static || Deno.env.get('STATIC_DIR') || 'static';
 const db = new DB(args.db || Deno.env.get('SQLITE_DB') || '.data/tiddly.db');
 
 const dbver = db.query('PRAGMA user_version')[0][0] as number;
@@ -14,7 +15,9 @@ if (dbver < 1) {
 		BEGIN;
 		CREATE TABLE wikis (
 			id INTEGER PRIMARY KEY,
-			token TEXT
+			token TEXT NOT NULL,
+			apphtml TEXT,
+			swjs TEXT
 		) STRICT;
 		CREATE TABLE tiddlers (
 			thash BLOB PRIMARY KEY NOT NULL,
@@ -37,6 +40,14 @@ const wikiIdQuery = db.prepareQuery<number>(`
 	SELECT id FROM wikis WHERE token = :token
 `);
 
+const apphtmlQuery = db.prepareQuery<string>(`
+	SELECT apphtml FROM wikis WHERE token LIKE :halftoken || '%'
+`);
+
+const swjsQuery = db.prepareQuery<string>(`
+	SELECT swjs FROM wikis WHERE token LIKE :halftoken || '%'
+`);
+
 const changedQuery = db.prepareQuery<
 	[Uint8Array, Uint8Array, Uint8Array, Uint8Array, Uint8Array, Uint8Array, number, boolean]
 >(`
@@ -56,6 +67,9 @@ const upsertQuery = db.prepareQuery(`
 	mtime = excluded.mtime,
 	deleted = excluded.deleted
 `);
+
+const apphtmlPat = new URLPattern({ pathname: '/:halftoken/app.html' });
+const swjsPat = new URLPattern({ pathname: '/:halftoken/sw.js' });
 
 const respHdrs = { 'Access-Control-Allow-Origin': '*' };
 
@@ -141,11 +155,32 @@ function handleDelete({ atoken, token }: { atoken: any; token: any }) {
 	return Response.json({}, { headers: respHdrs, status: 200 });
 }
 
+function handleUploadApp({ token, apphtml, swjs }: { token: any; apphtml: any; swjs: any }) {
+	if (typeof token !== 'string' || typeof apphtml !== 'string' || typeof swjs !== 'string') {
+		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
+	}
+	db.query(`UPDATE wikis SET apphtml = :apphtml, swjs = :swjs WHERE token = :token`, { token, apphtml, swjs });
+	return Response.json({ url: token.slice(0, token.length / 2) + '/app.html' }, { headers: respHdrs, status: 200 });
+}
+
+function handleDbFile(pattern: URLPattern, url: string, query: any, ctype: string): Response | null {
+	const match = pattern.exec(url);
+	if (!match) {
+		return null;
+	}
+	const res = query.all(match.pathname.groups);
+	if (res.length === 0) {
+		return Response.json({}, { status: 404 });
+	}
+	return new Response(res[0][0], { headers: { 'content-type': ctype } });
+}
+
 async function handle(req: Request) {
 	if (req.method === 'GET') {
-		return serveDir(req, {
-			fsRoot: args.static || 'static',
-		});
+		return handleDbFile(apphtmlPat, req.url, apphtmlQuery, 'text/html;charset=utf-8') ||
+			handleDbFile(swjsPat, req.url, swjsQuery, 'text/javascript;charset=utf-8') || serveDir(req, {
+				fsRoot: staticdir,
+			});
 	}
 	if (req.method === 'POST') {
 		const data = await req.json();
@@ -160,6 +195,9 @@ async function handle(req: Request) {
 		}
 		if (data.op === 'delete') {
 			return handleDelete(data);
+		}
+		if (data.op === 'uploadapp') {
+			return handleUploadApp(data);
 		}
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
