@@ -1,13 +1,11 @@
 import { serveListener } from 'https://deno.land/std@0.150.0/http/server.ts';
-import { serveDir } from 'https://deno.land/std@0.150.0/http/file_server.ts';
 import { parse as argparse } from 'https://deno.land/std@0.150.0/flags/mod.ts';
 import * as base64 from 'https://deno.land/std@0.150.0/encoding/base64.ts';
 import * as brotli from 'https://deno.land/x/brotli@v0.1.4/mod.ts';
 import { DB } from 'https://deno.land/x/sqlite@v3.4.0/mod.ts';
 
 const args = argparse(Deno.args);
-const admintoken = args.admintoken || Deno.env.get('ADMIN_TOKEN');
-const staticdir = args.static || Deno.env.get('STATIC_DIR') || 'static';
+const admintoken = (args.admintoken || Deno.env.get('ADMIN_TOKEN'))?.trim();
 const db = new DB(args.db || Deno.env.get('SQLITE_DB') || '.data/tiddly.db');
 const utfenc = new TextEncoder();
 
@@ -224,9 +222,8 @@ function handleDbFile(pattern: URLPattern, req: Request, query: any, ctype: stri
 async function handle(req: Request) {
 	if (req.method === 'GET') {
 		return await handleDbFile(apphtmlPat, req, apphtmlQuery, 'text/html;charset=utf-8') ||
-			await handleDbFile(swjsPat, req, swjsQuery, 'text/javascript;charset=utf-8') || serveDir(req, {
-				fsRoot: staticdir,
-			});
+			await handleDbFile(swjsPat, req, swjsQuery, 'text/javascript;charset=utf-8') ||
+			Response.json({}, { headers: respHdrs, status: 404 });
 	}
 	if (req.method === 'POST') {
 		const data = await req.json();
