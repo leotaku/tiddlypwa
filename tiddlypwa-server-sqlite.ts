@@ -70,10 +70,11 @@ const upsertQuery = db.prepareQuery(`
 	deleted = excluded.deleted
 `);
 
+const apiPat = new URLPattern({ pathname: '/tid.dly' });
 const apphtmlPat = new URLPattern({ pathname: '/:halftoken/app.html' });
 const swjsPat = new URLPattern({ pathname: '/:halftoken/sw.js' });
 
-const respHdrs = { 'Access-Control-Allow-Origin': '*' };
+const respHdrs = { 'access-control-allow-origin': '*' };
 
 function parseTime(x: number) {
 	const time = new Date();
@@ -183,68 +184,72 @@ async function handleUploadApp({ token, apphtml, swjs }: { token: any; apphtml: 
 
 function handleDbFile(pattern: URLPattern, req: Request, query: any, ctype: string): Response | null {
 	const match = pattern.exec(req.url);
-	if (!match) {
-		return null;
+	if (!match) return null;
+	if (req.method !== 'GET' && req.method !== 'HEAD') {
+		return new Response(null, { status: 405, headers: { 'allow': 'GET, HEAD' } });
 	}
 	const res = query.all(match.pathname.groups);
 	if (res.length === 0) {
 		return Response.json({}, { status: 404 });
 	}
 	const supportsBrotli = req.headers.get('accept-encoding')?.split(',').find((x) => x.trim().split(';')[0] === 'br');
-	const [body, etag] = res[0];
+	let [body, etag] = res[0];
 	const etagstr = '"' + base64.encode(etag) + (supportsBrotli ? '-b' : '-x') + '"';
 	// if we decomress and Deno recompresses to something else (gzip) it'll mark the ETag as a weak validator
-	const commonHeaders = {
+	const headers = new Headers({
 		'content-type': ctype,
 		'vary': 'Accept-Encoding',
 		'cache-control': 'no-cache',
 		'etag': etagstr,
-	};
+	});
 	if (req.headers.get('if-none-match') === etagstr) {
 		return new Response(null, {
 			status: 304,
-			headers: commonHeaders,
+			headers,
 		});
 	}
 	if (supportsBrotli) {
-		return new Response(body, {
-			headers: {
-				...commonHeaders,
-				'content-encoding': 'br',
-			},
-		});
+		headers.set('content-encoding', 'br');
+	} else {
+		body = brotli.decompress(body);
 	}
-	return new Response(brotli.decompress(body), {
-		headers: commonHeaders,
-	});
+	headers.set('content-length', body.length);
+	return new Response(req.method === 'HEAD' ? null : body, { headers });
 }
 
-async function handle(req: Request) {
-	if (req.method === 'GET') {
-		return await handleDbFile(apphtmlPat, req, apphtmlQuery, 'text/html;charset=utf-8') ||
-			await handleDbFile(swjsPat, req, swjsQuery, 'text/javascript;charset=utf-8') ||
-			Response.json({}, { headers: respHdrs, status: 404 });
+async function handleApiEndpoint(req: Request) {
+	if (!apiPat.exec(req.url)) return null;
+	if (req.method === 'OPTIONS') {
+		return new Response(null, {
+			headers: {
+				...respHdrs,
+				'access-control-allow-methods': 'POST, GET, OPTIONS',
+				'access-control-allow-headers': '*',
+			},
+			status: 204,
+		});
 	}
 	if (req.method === 'POST') {
 		const data = await req.json();
 		if (data.tiddlypwa !== 1 || !data.op) {
 			return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 		}
-		if (data.op === 'sync') {
-			return handleSync(data);
-		}
-		if (data.op === 'create') {
-			return handleCreate(data);
-		}
-		if (data.op === 'delete') {
-			return handleDelete(data);
-		}
-		if (data.op === 'uploadapp') {
-			return handleUploadApp(data);
-		}
-		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
+		if (data.op === 'sync') return handleSync(data);
+		if (data.op === 'create') return handleCreate(data);
+		if (data.op === 'delete') return handleDelete(data);
+		if (data.op === 'uploadapp') return handleUploadApp(data);
 	}
-	return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 404 });
+	if (req.method === 'GET') {
+		// TODO: SSE
+	}
+	return Response.json({ error: 'EPROTO' }, { status: 405, headers: { ...respHdrs, 'allow': 'OPTIONS, POST, GET' } });
+}
+
+async function handle(req: Request) {
+	return await handleDbFile(apphtmlPat, req, apphtmlQuery, 'text/html;charset=utf-8') ||
+		await handleDbFile(swjsPat, req, swjsQuery, 'text/javascript;charset=utf-8') ||
+		await handleApiEndpoint(req) ||
+		Response.json({}, { headers: respHdrs, status: 404 });
 }
 
 const listen: any = { port: 8000 };
