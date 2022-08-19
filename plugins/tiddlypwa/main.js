@@ -164,6 +164,7 @@ Formatted with `deno fmt`.
 				).then((_x) => {
 					this.reflectSyncServers();
 					this.serversChannel.postMessage(true);
+					this.backgroundSync();
 				}).catch((e) => {
 					this.logger.alert('Failed to save the sync server!', e);
 				});
