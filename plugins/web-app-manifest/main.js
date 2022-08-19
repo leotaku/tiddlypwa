@@ -28,7 +28,9 @@ Formatted with `deno fmt`.
 			const fields = $tw.wiki.getTiddler(x).fields;
 
 			return {
-				src: `data:${fields.type}${$tw.wiki.isBinaryTiddler(x) ? ';base64' : ''},${fields.text}`,
+				src: $tw.wiki.isBinaryTiddler(x)
+					? `data:${fields.type};base64,${fields.text}`
+					: `data:${fields.type},${encodeURIComponent(fields.text)}`,
 				type: fields.type,
 				sizes: fields.sizes || 'any',
 				purpose: fields.purpose || 'any',

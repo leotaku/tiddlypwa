@@ -16,6 +16,6 @@ Formatted with `deno fmt`.
 	exports.params = [];
 
 	exports.run = function () {
-		return encodeURIComponent($tw.__tiddlypwa_manifest__);
+		return '`' + encodeURIComponent($tw.__tiddlypwa_manifest__) + '`';
 	};
 })();
