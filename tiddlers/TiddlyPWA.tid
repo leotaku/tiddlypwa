@@ -11,6 +11,13 @@ This will reload the page, and you will be asked for a password.
 If you do not yet have one, make one up!
 Note that you must to use the same password on all TiddlyPWA instances you'd want to sync between.
 
+<details>
+<summary>Upload this version to any sync server…</summary>
+{{$:/plugins/valpackett/tiddlypwa/upload-app-form}}
+</details>
+
+{{$:/status/TiddlyPWAUploadResult}}
+
 !! Hosting a custom instance
 
 First, either start with this page or add the following plugins to a fresh TiddlyWiki file:

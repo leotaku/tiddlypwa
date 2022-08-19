@@ -1,0 +1,10 @@
+title: $:/plugins/valpackett/tiddlypwa/upload-app-form
+
+<label>URL: <$edit-text tiddler="$:/temp/TiddlyPWAServerURL" tag="input" default="https://" /></label>
+<label>Token: <$edit-text tiddler="$:/temp/TiddlyPWAServerToken" tag="input" default="" /></label>
+<$button>
+<$action-sendmessage $message="tiddlypwa-upload-app-wiki"
+    publishFilter={{$:/plugins/valpackett/tiddlypwa/app-filter}} 
+    uploadUrl={{$:/temp/TiddlyPWAServerURL}} uploadToken={{$:/temp/TiddlyPWAServerToken}} />
+Upload
+</$button>

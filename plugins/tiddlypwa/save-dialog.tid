@@ -64,6 +64,11 @@ upload it to sync servers
 </$button>
 </$reveal>!
 
+<details>
+<summary>Or even upload to a sync server you are not currently syncing with…</summary>
+{{$:/plugins/valpackett/tiddlypwa/upload-app-form}}
+</details>
+
 {{$:/status/TiddlyPWAUploadResult}}
 
 Note that some basic configuration like the title, subtitle, favicon, theme and palette will be saved unencrypted.

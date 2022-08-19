@@ -532,9 +532,11 @@ Formatted with `deno fmt`.
 			);
 			const swjs = $tw.wiki.renderTiddler('text/plain', '$:/plugins/valpackett/tiddlypwa-offline/sw.js', {});
 			try {
-				const servers = await adb(
-					this.db.transaction('syncservers').objectStore('syncservers').getAll(),
-				);
+				const servers = (variables.uploadUrl && variables.uploadToken)
+					? [{ url: variables.uploadUrl, token: variables.uploadToken }]
+					: await adb(
+						this.db.transaction('syncservers').objectStore('syncservers').getAll(),
+					);
 				const resps = await Promise.all(servers.map(({ url, token }) =>
 					fetch(url, {
 						method: 'POST',
