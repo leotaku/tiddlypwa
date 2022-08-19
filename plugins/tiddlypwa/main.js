@@ -628,12 +628,11 @@ Formatted with `deno fmt`.
 				body: JSON.stringify({ tiddlypwa: 1, op: 'sync', token, now, lastSync, clientChanges }),
 			});
 			if (!resp.ok) {
-				try {
-					const { error } = await resp.json();
-					throw new Error(knownErrors[error] || error);
-				} catch (_e) {
-					throw new Error('Server returned error ' + resp.status);
-				}
+				throw new Error(
+					await resp.json().then(({ error }) => knownErrors[error] || error).catch((_e) =>
+						'Server returned error ' + resp.status
+					),
+				);
 			}
 			const { serverChanges } = await resp.json();
 			const titlesToRead = [];
