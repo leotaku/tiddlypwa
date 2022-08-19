@@ -30,6 +30,9 @@ Storage usage information is unavailable in this browser.
 Browser storage usage estimate (may be weird): {{$:/status/TiddlyPWAStorageQuota}}
 </$reveal>
 
+You can <$button message="tiddlypwa-drop-db">clear storage</$button> if you want to destroy
+the local copy of this wiki's data. (This won't touch sync servers.)
+
 !! Password Protection
 
 The password (or technically, the encryption key derived from it) is currently

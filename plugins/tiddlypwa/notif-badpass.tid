@@ -1,3 +1,4 @@
 title: $:/plugins/valpackett/tiddlypwa/notif-badpass
 
 Wrong password, try again!
+Or <$button message="tiddlypwa-drop-db">clear storage</$button> if you completely forgot the password.

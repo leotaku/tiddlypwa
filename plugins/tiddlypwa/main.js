@@ -105,7 +105,10 @@ Formatted with `deno fmt`.
 			$tw.rootWidget.addEventListener('tiddlypwa-init', (_evt) => {
 				const req = indexedDB.open(`tiddlypwa:${location.pathname}`, 1);
 				req.onupgradeneeded = (evt) => this.initDb(evt.target.result);
-				adb(req).then((_) => location.href = location.href);
+				adb(req).then((_) => {
+					$tw.syncer.isDirty = () => false; // skip the onbeforeunload
+					location.reload();
+				});
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-remember', (_evt) => {
@@ -133,6 +136,10 @@ Formatted with `deno fmt`.
 
 			$tw.rootWidget.addEventListener('tiddlypwa-enable-persistence', (_evt) => {
 				navigator.storage.persist().then(() => this.reflectStorageInfo());
+			});
+
+			$tw.rootWidget.addEventListener('tiddlypwa-drop-db', (_evt) => {
+				this.dropDb();
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-add-sync-server', (evt) => {
@@ -179,9 +186,7 @@ Formatted with `deno fmt`.
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-browser-refresh', (_evt) => {
-				$tw.syncer.isDirty = function () {
-					return false;
-				}; // skip the onbeforeunload
+				$tw.syncer.isDirty = () => false; // skip the onbeforeunload
 				location.reload(); // tm-browser-refresh passes 'true' which skips the serviceworker. silly!
 			});
 
@@ -288,6 +293,20 @@ Formatted with `deno fmt`.
 			db.createObjectStore('session', { autoIncrement: true });
 			db.createObjectStore('syncservers', { autoIncrement: true });
 			db.createObjectStore('tiddlers', { keyPath: 'thash' });
+		}
+
+		dropDb() {
+			const instdesc = `(origin: ${location.origin}; path: ${location.pathname})`;
+			if (!confirm(`Are you sure you want to DELETE the local data for this instance ${instdesc} of TiddlyPWA?`)) {
+				return;
+			}
+			if (this.db) {
+				this.db.close();
+				this.db = undefined;
+			}
+			$tw.syncer.isDirty = () => false; // skip the onbeforeunload
+			adb(indexedDB.deleteDatabase(`tiddlypwa:${location.pathname}`)).then((_) => location.reload())
+				.catch((e) => this.logger.alert('Failed to delete database!', e));
 		}
 
 		async _getStatus() {
