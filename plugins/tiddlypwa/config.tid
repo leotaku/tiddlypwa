@@ -2,12 +2,12 @@ title: $:/plugins/valpackett/tiddlypwa/config
 tags: $:/tags/ControlPanel
 caption: Storage and Sync
 
-<$reveal type="match" state="$:/status/TiddlyPWADemoMode" text="yes">
-TiddlyPWA is running in demo/installer mode.
+<$reveal type="match" state="$:/status/TiddlyPWADocsMode" text="yes">
+TiddlyPWA is running in documentation/installer mode.
 You can <$button message="tiddlypwa-init">start using ~TiddlyPWA</$button> on this page right now!
 </$reveal>
 
-<$reveal type="nomatch" state="$:/status/TiddlyPWADemoMode" text="yes">
+<$reveal type="nomatch" state="$:/status/TiddlyPWADocsMode" text="yes">
 
 !! Browser Storage
 

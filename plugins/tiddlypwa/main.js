@@ -326,7 +326,7 @@ Formatted with `deno fmt`.
 					this.db = await adb(req);
 				} catch (e) {
 					if (e.name === 'AbortError') {
-						this.wiki.addTiddler({ title: '$:/status/TiddlyPWADemoMode', text: 'yes' });
+						this.wiki.addTiddler({ title: '$:/status/TiddlyPWADocsMode', text: 'yes' });
 						return;
 					}
 					throw e;

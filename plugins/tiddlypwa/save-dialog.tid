@@ -44,22 +44,22 @@ save this wiki without ~TiddlyPWA
 Note that the native ~TiddlyWiki password that is configured via the button above will ''only''
 apply to files saved via this save button — it is completely independent of the ~TiddlyPWA storage password.
 
-!! Export as ~TiddlyPWA app HTML
+!! Export as ~TiddlyPWA app wiki
 
 <$reveal type="match" state="$:/isEncrypted" text="yes">
 ~TiddlyWiki single-file password must not be used when doing this, please unset it using the "clear password" button above.
 </$reveal>
 <$reveal type="nomatch" state="$:/isEncrypted" text="yes">
 
-To update the wiki file that is used as the ~TiddlyPWA application (for example to install plugins/themes), you can
+To update the wiki file that is used as the ~TiddlyPWA application (''this is the kind of save you want to install plugins/themes''), you can
 <$button>
-<$action-sendmessage $message="tm-download-file" publishFilter="-[is[tiddler]] [[$:/core]] [[$:/favicon.ico]] [[$:/SiteTitle]] [[$:/SiteSubtitle]] [[$:/language]] [[$:/theme]] [[$:/palette]] [prefix[$:/themes/]] [prefix[$:/plugins/]]"/>
+<$action-sendmessage $message="tm-download-file" publishFilter={{$:/plugins/valpackett/tiddlypwa/app-filter}} />
 save this wiki without content
 </$button>
 <$reveal type="nomatch" state="$:/status/TiddlyPWAUploading" text="yes">
 or directly
 <$button>
-<$action-sendmessage $message="tiddlypwa-upload-app-wiki" publishFilter="-[is[tiddler]] [[$:/core]] [[$:/favicon.ico]] [[$:/SiteTitle]] [[$:/SiteSubtitle]] [[$:/language]] [[$:/theme]] [[$:/palette]] [prefix[$:/themes/]] [prefix[$:/plugins/]]"/>
+<$action-sendmessage $message="tiddlypwa-upload-app-wiki" publishFilter={{$:/plugins/valpackett/tiddlypwa/app-filter}} />
 upload it to sync servers
 </$button>
 </$reveal>!
@@ -67,5 +67,14 @@ upload it to sync servers
 {{$:/status/TiddlyPWAUploadResult}}
 
 Note that some basic configuration like the title, subtitle, favicon, theme and palette will be saved unencrypted.
+
+<details>
+<summary>Specifically, these tiddlers will be saved…</summary>
+<ul>
+<$list filter={{$:/plugins/valpackett/tiddlypwa/app-filter}}>
+<li><<currentTiddler>></li>
+</$list>
+</ul>
+</details>
 
 </$reveal>
