@@ -16,6 +16,7 @@ Formatted with `deno fmt`.
 	}
 
 	const knownErrors = {
+		EAUTH: 'Wrong password and/or sync token',
 		EPROTO: 'Protocol incompatibility',
 		ETIME: 'The time is too different between the server and the device',
 	};
@@ -625,7 +626,15 @@ Formatted with `deno fmt`.
 				headers: {
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({ tiddlypwa: 1, op: 'sync', token, now, lastSync, clientChanges }),
+				body: JSON.stringify({
+					tiddlypwa: 1,
+					op: 'sync',
+					token,
+					authcode: await b64enc(await this.titlehash(token)),
+					now,
+					lastSync,
+					clientChanges,
+				}),
 			});
 			if (!resp.ok) {
 				throw new Error(

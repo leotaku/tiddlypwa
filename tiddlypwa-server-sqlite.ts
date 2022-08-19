@@ -16,6 +16,7 @@ if (dbver < 1) {
 		CREATE TABLE wikis (
 			id INTEGER PRIMARY KEY,
 			token TEXT NOT NULL,
+			authcode BLOB,
 			apphtml BLOB,
 			apphtmletag BLOB,
 			swjs BLOB,
@@ -38,15 +39,15 @@ if (dbver < 1) {
 	`);
 }
 
-const wikiIdQuery = db.prepareQuery<number>(`
-	SELECT id FROM wikis WHERE token = :token
+const wikiAuthQuery = db.prepareQuery(`
+	SELECT id, authcode FROM wikis WHERE token = :token
 `);
 
-const apphtmlQuery = db.prepareQuery<string>(`
+const apphtmlQuery = db.prepareQuery(`
 	SELECT apphtml, apphtmletag FROM wikis WHERE token LIKE :halftoken || '%'
 `);
 
-const swjsQuery = db.prepareQuery<string>(`
+const swjsQuery = db.prepareQuery(`
 	SELECT swjs, swjsetag FROM wikis WHERE token LIKE :halftoken || '%'
 `);
 
@@ -83,10 +84,17 @@ function parseTime(x: number) {
 }
 
 function handleSync(
-	{ token, now, clientChanges, lastSync }: { token: any; now: any; clientChanges: any; lastSync: any },
+	{ token, authcode, now, clientChanges, lastSync }: {
+		token: any;
+		authcode: any;
+		now: any;
+		clientChanges: any;
+		lastSync: any;
+	},
 ) {
 	if (
-		typeof token !== 'string' || typeof now !== 'string' || typeof lastSync !== 'string' ||
+		typeof token !== 'string' || typeof authcode !== 'string' || typeof now !== 'string' ||
+		typeof lastSync !== 'string' ||
 		!Array.isArray(clientChanges)
 	) {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
@@ -94,13 +102,22 @@ function handleSync(
 	if (Math.abs(new Date(now).getTime() - new Date().getTime()) > 60000) {
 		return Response.json({ error: 'ETIMESYNC' }, { headers: respHdrs, status: 400 });
 	}
-	const wikiRows = wikiIdQuery.all({ token });
+	const wikiRows = wikiAuthQuery.all({ token });
 	if (wikiRows.length < 1) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	const wiki = wikiRows[0][0] as number;
+	const [wiki, dbauthcode] = wikiRows[0];
+	if (dbauthcode && authcode !== dbauthcode) {
+		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
+	}
 	const serverChanges: Array<Record<string, string | Date | boolean | null>> = [];
 	db.transaction(() => {
+		if (!dbauthcode) {
+			db.query(
+				`UPDATE wikis SET authcode = :authcode WHERE token = :token`,
+				{ token, authcode },
+			);
+		}
 		for (
 			const { thash, title, tiv, dhash, data, iv, mtime, deleted } of changedQuery.iterEntries({
 				modsince: new Date(lastSync).getTime(),
