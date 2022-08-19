@@ -464,7 +464,6 @@ Formatted with `deno fmt`.
 		}
 
 		async _loadTiddler(title) {
-			if (title === '$:/StoryList') this.loadedStoryList = true;
 			const thash = await this.titlehash(title);
 			const obj = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').get(thash));
 			const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.iv }, this.key, obj.data);
@@ -478,6 +477,7 @@ Formatted with `deno fmt`.
 					// XXX: syncer should itself monitor for changes and recompile
 					$tw.syncer.filterFn = this.wiki.compileFilter(tiddler.text);
 				}
+				if (title === '$:/StoryList') this.loadedStoryList = true;
 			}).catch((e) => cb(e));
 		}
 
