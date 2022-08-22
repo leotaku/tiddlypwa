@@ -199,15 +199,29 @@ async function handleUploadApp({ token, apphtml, swjs }: { token: any; apphtml: 
 	return Response.json({ url: token.slice(0, token.length / 2) + '/app.html' }, { headers: respHdrs, status: 200 });
 }
 
+function preflightResp(methods: string) {
+	return new Response(null, {
+		headers: {
+			...respHdrs,
+			'access-control-allow-methods': methods,
+			'access-control-allow-headers': '*',
+		},
+		status: 204,
+	});
+}
+
 function handleDbFile(pattern: URLPattern, req: Request, query: any, ctype: string): Response | null {
 	const match = pattern.exec(req.url);
 	if (!match) return null;
-	if (req.method !== 'GET' && req.method !== 'HEAD') {
-		return new Response(null, { status: 405, headers: { 'allow': 'GET, HEAD' } });
+	if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+		return new Response(null, { status: 405, headers: { 'allow': 'GET, HEAD, OPTIONS' } });
 	}
 	const res = query.all(match.pathname.groups);
 	if (res.length === 0) {
 		return Response.json({}, { status: 404 });
+	}
+	if (req.method === 'OPTIONS') {
+		return preflightResp('GET, HEAD, OPTIONS');
 	}
 	const supportsBrotli = req.headers.get('accept-encoding')?.split(',').find((x) => x.trim().split(';')[0] === 'br');
 	let [body, etag] = res[0];
@@ -237,14 +251,7 @@ function handleDbFile(pattern: URLPattern, req: Request, query: any, ctype: stri
 async function handleApiEndpoint(req: Request) {
 	if (!apiPat.exec(req.url)) return null;
 	if (req.method === 'OPTIONS') {
-		return new Response(null, {
-			headers: {
-				...respHdrs,
-				'access-control-allow-methods': 'POST, GET, OPTIONS',
-				'access-control-allow-headers': '*',
-			},
-			status: 204,
-		});
+		return preflightResp('POST, GET, OPTIONS');
 	}
 	if (req.method === 'POST') {
 		const data = await req.json();
