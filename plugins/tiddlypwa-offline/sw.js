@@ -34,7 +34,7 @@ async function fromCache(evt) {
 }
 
 self.addEventListener('fetch', (evt) => {
-	if ((evt.request.url.endsWith('/') || evt.request.url.endsWith('.html')) && evt.request.method === 'GET') {
+	if (evt.request.destination === 'document' && evt.request.method === 'GET') {
 		evt.respondWith(fromCache(evt));
 	}
 });
