@@ -8,6 +8,8 @@ Formatted with `deno fmt`.
 const CACHE = 'tiddlypwa';
 
 async function fromNetCaching(evt, cacheResp) {
+	// "preflight" for letting the server wake up if it's on a free service that suspends instances:
+	await fetch(evt.request.url, { method: 'OPTIONS' });
 	const response = await fetch(evt.request);
 	if (response.ok) {
 		const changed = cacheResp && (await response.clone().text() !== await cacheResp.text());
