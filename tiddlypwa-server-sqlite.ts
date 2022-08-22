@@ -16,7 +16,7 @@ if (dbver < 1) {
 		CREATE TABLE wikis (
 			id INTEGER PRIMARY KEY,
 			token TEXT NOT NULL,
-			authcode BLOB,
+			authcode TEXT,
 			apphtml BLOB,
 			apphtmletag BLOB,
 			swjs BLOB,
