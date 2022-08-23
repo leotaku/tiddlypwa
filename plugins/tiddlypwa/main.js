@@ -18,7 +18,7 @@ Formatted with `deno fmt`.
 	const knownErrors = {
 		EAUTH: 'Wrong password and/or sync token',
 		EPROTO: 'Protocol incompatibility',
-		ETIME: 'The time is too different between the server and the device',
+		ETIMESYNC: 'The current time is too different between the server and the device',
 	};
 
 	const utfenc = new TextEncoder('utf-8');
