@@ -440,7 +440,7 @@ Formatted with `deno fmt`.
 			const thash = await this.titlehash(tiddler.fields.title);
 			const jsondata = this.wiki.getTiddlerAsJson(tiddler.fields.title);
 			// padding because sync servers don't need to know the precise lengths of everything
-			const rawdata = utfenc.encode('\n'.repeat(512 - (jsondata.length % 512)) + jsondata);
+			const rawdata = utfenc.encode('\n'.repeat(256 - (jsondata.length % 256)) + jsondata);
 			const dhash = await crypto.subtle.sign('HMAC', this.mackey, rawdata);
 			// "if you use nonces longer than 12 bytes, they get hashed into 12 bytes anyway" - soatok.blog
 			const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -511,8 +511,13 @@ Formatted with `deno fmt`.
 			await adb(
 				this.db.transaction('tiddlers', 'readwrite').objectStore('tiddlers').put({
 					thash,
-					deleted: true,
+					title: null,
+					tiv: null,
+					dhash: null,
+					data: null,
+					iv: null,
 					mtime: new Date(),
+					deleted: true,
 				}),
 			);
 			await this.reflectStorageInfo();
