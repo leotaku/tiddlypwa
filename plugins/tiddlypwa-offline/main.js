@@ -12,6 +12,9 @@ Formatted with `deno fmt`.
 	if (!$tw.browser) return;
 
 	exports.startup = function () {
+		$tw.rootWidget.addEventListener('tiddlypwaoffline-browser-refresh', (_evt) => {
+			location.reload(); // tm-browser-refresh passes 'true' which skips the serviceworker. silly!
+		});
 		navigator.serviceWorker.register('sw.js').then((reg) => reg.update()).catch((e) => {
 			if (!navigator.onLine) return;
 			$tw.wiki.addTiddler({ title: '$:/status/TiddlyPWAWorkerError', text: e.message });
