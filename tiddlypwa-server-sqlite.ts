@@ -26,7 +26,6 @@ if (dbver < 1) {
 			thash BLOB PRIMARY KEY NOT NULL,
 			title BLOB,
 			tiv BLOB,
-			dhash BLOB,
 			data BLOB,
 			iv BLOB,
 			mtime INTEGER NOT NULL,
@@ -52,19 +51,18 @@ const swjsQuery = db.prepareQuery(`
 `);
 
 const changedQuery = db.prepareQuery<
-	[Uint8Array, Uint8Array, Uint8Array, Uint8Array, Uint8Array, Uint8Array, number, boolean]
+	[Uint8Array, Uint8Array, Uint8Array, Uint8Array, Uint8Array, number, boolean]
 >(`
-	SELECT thash, title, tiv, dhash, data, iv, mtime, deleted
+	SELECT thash, title, tiv, data, iv, mtime, deleted
 	FROM tiddlers WHERE mtime > :modsince AND wiki = :wiki
 `);
 
 const upsertQuery = db.prepareQuery(`
-	INSERT INTO tiddlers (thash, title, tiv, dhash, data, iv, mtime, deleted, wiki)
-	VALUES (:thash, :title, :tiv, :dhash, :data, :iv, :mtime, :deleted, :wiki)
+	INSERT INTO tiddlers (thash, title, tiv, data, iv, mtime, deleted, wiki)
+	VALUES (:thash, :title, :tiv, :data, :iv, :mtime, :deleted, :wiki)
 	ON CONFLICT (thash) DO UPDATE SET
 	title = excluded.title,
 	tiv = excluded.tiv,
-	dhash = excluded.dhash,
 	data = excluded.data,
 	iv = excluded.iv,
 	mtime = excluded.mtime,
@@ -119,7 +117,7 @@ function handleSync(
 			);
 		}
 		for (
-			const { thash, title, tiv, dhash, data, iv, mtime, deleted } of changedQuery.iterEntries({
+			const { thash, title, tiv, data, iv, mtime, deleted } of changedQuery.iterEntries({
 				modsince: new Date(lastSync).getTime(),
 				wiki,
 			})
@@ -128,19 +126,17 @@ function handleSync(
 				thash: thash ? base64.encode(thash as Uint8Array) : null,
 				title: title ? base64.encode(title as Uint8Array) : null,
 				tiv: tiv ? base64.encode(tiv as Uint8Array) : null,
-				dhash: dhash ? base64.encode(dhash as Uint8Array) : null,
 				data: data ? base64.encode(data as Uint8Array) : null,
 				iv: iv ? base64.encode(iv as Uint8Array) : null,
 				mtime: parseTime(mtime as number),
 				deleted: !!(deleted as number),
 			});
 		}
-		for (const { thash, title, tiv, dhash, data, iv, mtime, deleted } of clientChanges) {
+		for (const { thash, title, tiv, data, iv, mtime, deleted } of clientChanges) {
 			upsertQuery.execute({
 				thash: base64.decode(thash),
 				title: base64.decode(title),
 				tiv: base64.decode(tiv),
-				dhash: base64.decode(dhash),
 				data: base64.decode(data),
 				iv: base64.decode(iv),
 				mtime: new Date(mtime || now).getTime(),

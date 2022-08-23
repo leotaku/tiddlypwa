@@ -441,7 +441,6 @@ Formatted with `deno fmt`.
 			const jsondata = this.wiki.getTiddlerAsJson(tiddler.fields.title);
 			// padding because sync servers don't need to know the precise lengths of everything
 			const rawdata = utfenc.encode('\n'.repeat(256 - (jsondata.length % 256)) + jsondata);
-			const dhash = await crypto.subtle.sign('HMAC', this.mackey, rawdata);
 			// "if you use nonces longer than 12 bytes, they get hashed into 12 bytes anyway" - soatok.blog
 			const iv = crypto.getRandomValues(new Uint8Array(12));
 			const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this.key, rawdata);
@@ -456,7 +455,6 @@ Formatted with `deno fmt`.
 					thash, // The title hash is the primary key
 					title, // Just-the-title encrypted: used to avoid decrypting other stuff in getSkinnyTiddlers
 					tiv,
-					dhash, // The data hash will be used for sync conflict resolution
 					data,
 					iv,
 					mtime: tiddler.fields.modified || new Date(), // Has to be unencrypted for sync conflict resolution
@@ -513,7 +511,6 @@ Formatted with `deno fmt`.
 					thash,
 					title: null,
 					tiv: null,
-					dhash: null,
 					data: null,
 					iv: null,
 					mtime: new Date(),
@@ -615,13 +612,12 @@ Formatted with `deno fmt`.
 			);
 			const clientChanges = [];
 			const changedKeys = new Set();
-			for (const { thash, title, tiv, dhash, data, iv, mtime, deleted } of changes) {
+			for (const { thash, title, tiv, data, iv, mtime, deleted } of changes) {
 				if (arrayEq(thash, this.storyListHash)) continue;
 				const tidjson = {
 					thash: await b64enc(thash),
 					title: await b64enc(title),
 					tiv: await b64enc(tiv),
-					dhash: await b64enc(dhash),
 					data: await b64enc(data),
 					iv: await b64enc(iv),
 					mtime,
@@ -659,13 +655,12 @@ Formatted with `deno fmt`.
 			const titlesToRead = [];
 			const titleHashesToDelete = new Set();
 			const txn = this.db.transaction('tiddlers', 'readwrite');
-			for (const { thash, title, tiv, dhash, data, iv, mtime, deleted } of serverChanges) {
+			for (const { thash, title, tiv, data, iv, mtime, deleted } of serverChanges) {
 				if (arrayEq(b64dec(thash), this.storyListHash)) continue;
 				const tid = {
 					thash: b64dec(thash),
 					title: b64dec(title),
 					tiv: b64dec(tiv),
-					dhash: b64dec(dhash),
 					data: b64dec(data),
 					iv: b64dec(iv),
 					mtime: new Date(mtime),
