@@ -192,6 +192,10 @@ Formatted with `deno fmt`.
 				location.reload(); // tm-browser-refresh passes 'true' which skips the serviceworker. silly!
 			});
 
+			$tw.rootWidget.addEventListener('tiddlypwa-sync-cancel', (_evt) => {
+				this.syncAbort.abort();
+			});
+
 			$tw.rootWidget.addEventListener('tiddlypwa-sync-all', (_evt) => {
 				this.sync(true);
 			});
@@ -590,6 +594,7 @@ Formatted with `deno fmt`.
 
 		async _syncOneUnlocked({ url, token, lastSync }, all = false, now = new Date()) {
 			this.logger.log('sync started', url, lastSync, all, now);
+			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncingWith', text: url });
 			const changes = [];
 			await new Promise((resolve) =>
 				this.db.transaction('tiddlers', 'readwrite').objectStore('tiddlers').openCursor().onsuccess = (evt) => {
@@ -621,7 +626,9 @@ Formatted with `deno fmt`.
 				changedKeys.add(tidjson.thash);
 				this.logger.log('local change', tidjson.thash);
 			}
+			this.syncAbort = new AbortController();
 			const resp = await fetch(url, {
+				signal: this.syncAbort.signal,
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -688,7 +695,7 @@ Formatted with `deno fmt`.
 				);
 				this.modifiedQueue.add(utfdec.decode(dectitle).trimStart());
 			}
-			this.logger.log('sync done', now);
+			this.logger.log('sync done', url, now);
 			return now;
 		}
 
@@ -709,7 +716,9 @@ Formatted with `deno fmt`.
 					server.lastSync = await this._syncOneUnlocked(server, all, now);
 					await adb(this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put(server, key));
 				} catch (e) {
-					this.logger.alert(`Could not sync with server "${server.url}"!`, e);
+					if (e.name !== 'AbortError') {
+						this.logger.alert(`Could not sync with server "${server.url}"!`, e);
+					}
 				}
 			}
 			$tw.syncer.syncFromServer(); // "server" being our local DB that we just updated, actually

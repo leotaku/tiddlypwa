@@ -1,0 +1,14 @@
+title: $:/plugins/valpackett/tiddlypwa/sync-status
+
+<$reveal type="nomatch" state="$:/status/TiddlyPWASyncing" text="yes">
+<$button message="tiddlypwa-sync">Sync now</$button>?
+(Advanced: try <$button message="tiddlypwa-sync-all">sync with all contents now</$button> if there are somehow changes that aren't being saved on the server.)
+</$reveal>
+
+<$reveal type="match" state="$:/status/TiddlyPWASyncing" text="yes">
+''Currently syncing'' with {{$:/status/TiddlyPWASyncingWith}}, <$button message="tiddlypwa-sync-cancel">cancel</$button>?
+</$reveal>
+
+<$reveal type="match" state="$:/status/TiddlyPWAOnline" text="no">
+(Seems like you are currently ''offline'' so sync won't work right now.)
+</$reveal>

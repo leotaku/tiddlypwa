@@ -45,6 +45,8 @@ The password (or technically, the encryption key derived from it) is currently
 
 !! Synchronization
 
+{{$:/plugins/valpackett/tiddlypwa/sync-status}}
+
 This device syncs wiki contents with the following servers:
 
 <table style="width:100%">
