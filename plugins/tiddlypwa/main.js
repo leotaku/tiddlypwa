@@ -651,7 +651,7 @@ Formatted with `deno fmt`.
 					),
 				);
 			}
-			const { serverChanges } = await resp.json();
+			const { serverChanges, appEtag } = await resp.json();
 			const titlesToRead = [];
 			const titleHashesToDelete = new Set();
 			const txn = this.db.transaction('tiddlers', 'readwrite');
@@ -694,6 +694,16 @@ Formatted with `deno fmt`.
 					title,
 				);
 				this.modifiedQueue.add(utfdec.decode(dectitle).trimStart());
+			}
+			if (appEtag && navigator.serviceWorker.controller) {
+				const cache = await caches.open('tiddlypwa');
+				for (const req of await cache.keys()) {
+					if (req.url !== document.location.href) continue;
+					const resp = await cache.match(req);
+					const cachedEtag = resp.headers.get('etag');
+					if (!cachedEtag || cachedEtag === appEtag) continue;
+					navigator.serviceWorker.controller.postMessage({ op: 'update', url: req.url });
+				}
 			}
 			this.logger.log('sync done', url, now);
 			return now;

@@ -7,17 +7,17 @@ Formatted with `deno fmt`.
 \*/
 const CACHE = 'tiddlypwa';
 
-async function fromNetCaching(evt, cacheResp) {
+async function fromNetCaching(req, cacheResp) {
 	// "preflight" for letting the server wake up if it's on a free service that suspends instances:
-	await fetch(evt.request.url, { method: 'OPTIONS' });
-	const response = await fetch(evt.request);
+	await fetch(req.url, { method: 'OPTIONS' });
+	const response = await fetch(req);
 	if (response.ok) {
 		const changed = cacheResp && (await response.clone().text() !== await cacheResp.text());
 		const cache = await caches.open(CACHE);
-		await cache.put(evt.request, response.clone());
+		await cache.put(req, response.clone());
 		if (changed) {
 			for (const client of await self.clients.matchAll()) {
-				client.postMessage({ typ: 'REFRESH' });
+				client.postMessage({ op: 'refresh' });
 			}
 		}
 	}
@@ -28,12 +28,24 @@ async function fromCache(evt) {
 	const cache = await caches.open(CACHE);
 	const response = await cache.match(evt.request);
 	if (response) {
-		fromNetCaching(evt, response.clone());
+		fromNetCaching(evt.request, response.clone());
 		return response;
 	} else {
-		return fromNetCaching(evt);
+		return fromNetCaching(evt.request);
 	}
 }
+
+self.addEventListener('message', (evt) =>
+	evt.waitUntil((async function () {
+		if (evt.data.op === 'update') {
+			const cache = await caches.open(CACHE);
+			for (const req of await cache.keys()) {
+				if (req.url === evt.data.url) {
+					await fromNetCaching(req, await cache.match(req));
+				}
+			}
+		}
+	})()));
 
 self.addEventListener('fetch', (evt) => {
 	if (evt.request.destination === 'document' && evt.request.method === 'GET') {

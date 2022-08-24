@@ -39,7 +39,7 @@ if (dbver < 1) {
 }
 
 const wikiAuthQuery = db.prepareQuery(`
-	SELECT id, authcode FROM wikis WHERE token = :token
+	SELECT id, authcode, apphtmletag FROM wikis WHERE token = :token
 `);
 
 const apphtmlQuery = db.prepareQuery(`
@@ -81,6 +81,11 @@ function parseTime(x: number) {
 	return time;
 }
 
+function processEtag(etag: Uint8Array, headers: Headers): [boolean, string] {
+	const supportsBrotli = !!headers.get('accept-encoding')?.split(',').find((x) => x.trim().split(';')[0] === 'br');
+	return [supportsBrotli, '"' + base64.encode(etag) + (supportsBrotli ? '-b' : '-x') + '"'];
+}
+
 function handleSync(
 	{ token, authcode, now, clientChanges, lastSync }: {
 		token: any;
@@ -89,6 +94,7 @@ function handleSync(
 		clientChanges: any;
 		lastSync: any;
 	},
+	headers: Headers,
 ) {
 	if (
 		typeof token !== 'string' || typeof authcode !== 'string' || typeof now !== 'string' ||
@@ -104,7 +110,7 @@ function handleSync(
 	if (wikiRows.length < 1) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	const [wiki, dbauthcode] = wikiRows[0];
+	const [wiki, dbauthcode, apphtmletag] = wikiRows[0];
 	if (dbauthcode && authcode !== dbauthcode) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
@@ -145,7 +151,9 @@ function handleSync(
 			});
 		}
 	});
-	return Response.json({ serverChanges }, { headers: respHdrs });
+	// assuming here that the browser would use the same Accept-Encoding as when requesting the page
+	const [_, appEtag] = processEtag(apphtmletag, headers);
+	return Response.json({ serverChanges, appEtag }, { headers: respHdrs });
 }
 
 function handleCreate({ atoken }: { atoken: any }) {
@@ -219,9 +227,8 @@ function handleDbFile(pattern: URLPattern, req: Request, query: any, ctype: stri
 	if (req.method === 'OPTIONS') {
 		return preflightResp('GET, HEAD, OPTIONS');
 	}
-	const supportsBrotli = req.headers.get('accept-encoding')?.split(',').find((x) => x.trim().split(';')[0] === 'br');
 	let [body, etag] = res[0];
-	const etagstr = '"' + base64.encode(etag) + (supportsBrotli ? '-b' : '-x') + '"';
+	const [supportsBrotli, etagstr] = processEtag(etag, req.headers);
 	// if we decomress and Deno recompresses to something else (gzip) it'll mark the ETag as a weak validator
 	const headers = new Headers({
 		'content-type': ctype,
@@ -254,7 +261,7 @@ async function handleApiEndpoint(req: Request) {
 		if (data.tiddlypwa !== 1 || !data.op) {
 			return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 		}
-		if (data.op === 'sync') return handleSync(data);
+		if (data.op === 'sync') return handleSync(data, req.headers);
 		if (data.op === 'create') return handleCreate(data);
 		if (data.op === 'delete') return handleDelete(data);
 		if (data.op === 'uploadapp') return handleUploadApp(data);

@@ -21,7 +21,7 @@ Formatted with `deno fmt`.
 			$tw.notifier.display('$:/plugins/valpackett/tiddlypwa-offline/notif-error');
 		});
 		navigator.serviceWorker.onmessage = (evt) => {
-			if (evt.data.typ == 'REFRESH') {
+			if (evt.data.op == 'refresh') {
 				$tw.notifier.display('$:/plugins/valpackett/tiddlypwa-offline/notif-refresh');
 			}
 		};
