@@ -222,7 +222,7 @@ Formatted with `deno fmt`.
 						key: cursor.key,
 						url,
 						token,
-						lastSync: lastSync.getTime() === 0 ? 'never' : lastSync.toLocaleString(),
+						lastSync: lastSync?.getTime() === 0 ? 'never' : lastSync?.toLocaleString(),
 					});
 					cursor.continue();
 				}
@@ -594,7 +594,7 @@ Formatted with `deno fmt`.
 			}
 		}
 
-		async _syncOneUnlocked({ url, token, lastSync }, all = false, now = new Date()) {
+		async _syncOneUnlocked({ url, token, lastSync = new Date(0) }, all = false, now = new Date()) {
 			this.logger.log('sync started', url, lastSync, all, now);
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncingWith', text: url });
 			const changes = [];
