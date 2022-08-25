@@ -86,9 +86,16 @@ function processEtag(etag: Uint8Array, headers: Headers): [boolean, string] {
 	return [supportsBrotli, '"' + base64.encode(etag) + (supportsBrotli ? '-b' : '-x') + '"'];
 }
 
+function notifyMonitors(token: string, browserToken: string) {
+	const chan = new BroadcastChannel(token);
+	chan.postMessage({ exclude: browserToken });
+	chan.close();
+}
+
 function handleSync(
-	{ token, authcode, now, clientChanges, lastSync }: {
+	{ token, browserToken, authcode, now, clientChanges, lastSync }: {
 		token: any;
+		browserToken: any;
 		authcode: any;
 		now: any;
 		clientChanges: any;
@@ -151,6 +158,7 @@ function handleSync(
 			});
 		}
 	});
+	if (typeof browserToken === 'string') notifyMonitors(token, browserToken);
 	// assuming here that the browser would use the same Accept-Encoding as when requesting the page
 	const [_, appEtag] = processEtag(apphtmletag, headers);
 	return Response.json({ serverChanges, appEtag }, { headers: respHdrs });
@@ -179,7 +187,9 @@ function handleDelete({ atoken, token }: { atoken: any; token: any }) {
 	return Response.json({}, { headers: respHdrs, status: 200 });
 }
 
-async function handleUploadApp({ token, apphtml, swjs }: { token: any; apphtml: any; swjs: any }) {
+async function handleUploadApp(
+	{ token, browserToken, apphtml, swjs }: { token: any; browserToken: any; apphtml: any; swjs: any },
+) {
 	if (typeof token !== 'string' || typeof apphtml !== 'string' || typeof swjs !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
@@ -200,7 +210,41 @@ async function handleUploadApp({ token, apphtml, swjs }: { token: any; apphtml: 
 			swjsetag: new Uint8Array(await crypto.subtle.digest('SHA-1', swjsutf)),
 		},
 	);
+	if (typeof browserToken === 'string') notifyMonitors(token, browserToken);
 	return Response.json({ url: token.slice(0, token.length / 2) + '/app.html' }, { headers: respHdrs, status: 200 });
+}
+
+function handleMonitor(query: URLSearchParams) {
+	const token = query.get('token');
+	const browserToken = query.get('browserToken');
+	if (!token || !browserToken) {
+		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
+	}
+	const wikiRows = wikiAuthQuery.all({ token });
+	if (wikiRows.length < 1) {
+		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
+	}
+	let pushChan: BroadcastChannel;
+	return new Response(
+		new ReadableStream({
+			async start(ctrl) {
+				pushChan = new BroadcastChannel(token);
+				pushChan.onmessage = (evt) => {
+					if (evt.data.exclude !== browserToken) ctrl.enqueue('event: sync\ndata: 1\n\n');
+				};
+			},
+			cancel() {
+				pushChan.close();
+			},
+		}).pipeThrough(new TextEncoderStream()),
+		{
+			headers: {
+				...respHdrs,
+				'content-type': 'text/event-stream',
+				'cache-control': 'no-store',
+			},
+		},
+	);
 }
 
 function preflightResp(methods: string) {
@@ -264,10 +308,11 @@ async function handleApiEndpoint(req: Request) {
 		if (data.op === 'sync') return handleSync(data, req.headers);
 		if (data.op === 'create') return handleCreate(data);
 		if (data.op === 'delete') return handleDelete(data);
-		if (data.op === 'uploadapp') return handleUploadApp(data);
+		if (data.op === 'uploadapp') return await handleUploadApp(data);
 	}
 	if (req.method === 'GET') {
-		// TODO: SSE
+		const query = new URL(req.url).searchParams;
+		if (query.get('op') === 'monitor') return handleMonitor(query);
 	}
 	return Response.json({ error: 'EPROTO' }, { status: 405, headers: { ...respHdrs, 'allow': 'OPTIONS, POST, GET' } });
 }
@@ -277,6 +322,10 @@ async function handle(req: Request) {
 		await handleDbFile(swjsPat, req, swjsQuery, 'text/javascript;charset=utf-8') ||
 		await handleApiEndpoint(req) ||
 		Response.json({}, { headers: respHdrs, status: 404 });
+}
+
+if (!('BroadcastChannel' in window)) {
+	throw new Error('BroadcastChannel not found, you may need to run deno with the --unstable flag');
 }
 
 const listen: any = { port: 8000 };
