@@ -16,7 +16,7 @@ async function fromNetCaching(req, cacheResp) {
 		const cache = await caches.open(CACHE);
 		await cache.put(req, response.clone());
 		if (changed) {
-			for (const client of await self.clients.matchAll()) {
+			for (const client of await clients.matchAll()) {
 				client.postMessage({ op: 'refresh' });
 			}
 		}
@@ -28,15 +28,15 @@ async function fromCache(evt) {
 	const cache = await caches.open(CACHE);
 	const response = await cache.match(evt.request);
 	if (response) {
-		fromNetCaching(evt.request, response.clone());
+		evt.waitUntil(fromNetCaching(evt.request, response.clone()));
 		return response;
 	} else {
-		return fromNetCaching(evt.request);
+		return await fromNetCaching(evt.request);
 	}
 }
 
 self.addEventListener('message', (evt) =>
-	evt.waitUntil((async function () {
+	evt.waitUntil(async function () {
 		if (evt.data.op === 'update') {
 			const cache = await caches.open(CACHE);
 			for (const req of await cache.keys()) {
@@ -45,10 +45,23 @@ self.addEventListener('message', (evt) =>
 				}
 			}
 		}
-	})()));
+	}()));
 
 self.addEventListener('fetch', (evt) => {
 	if (evt.request.destination === 'document' && evt.request.method === 'GET') {
 		evt.respondWith(fromCache(evt));
 	}
+});
+
+self.addEventListener('activate', (evt) => {
+	evt.waitUntil(clients.claim());
+});
+
+self.addEventListener('install', (evt) => {
+	skipWaiting();
+	evt.waitUntil(async function () {
+		const url = (await clients.matchAll({ includeUncontrolled: true }))[0].url;
+		url.hash = '';
+		await fromNetCaching(new Request(url));
+	}());
 });
