@@ -89,7 +89,7 @@ function processEtag(etag: Uint8Array, headers: Headers): [boolean, string] {
 function notifyMonitors(token: string, browserToken: string) {
 	const chan = new BroadcastChannel(token);
 	chan.postMessage({ exclude: browserToken });
-	chan.close();
+	// chan.close(); // -> Uncaught (in promise) BadResource: Bad resource ID ?!
 }
 
 function handleSync(
@@ -158,7 +158,7 @@ function handleSync(
 			});
 		}
 	});
-	if (typeof browserToken === 'string') notifyMonitors(token, browserToken);
+	if (clientChanges.length > 0 && typeof browserToken === 'string') notifyMonitors(token, browserToken);
 	// assuming here that the browser would use the same Accept-Encoding as when requesting the page
 	const [_, appEtag] = processEtag(apphtmletag, headers);
 	return Response.json({ serverChanges, appEtag }, { headers: respHdrs });
@@ -228,6 +228,7 @@ function handleMonitor(query: URLSearchParams) {
 	return new Response(
 		new ReadableStream({
 			async start(ctrl) {
+				ctrl.enqueue('event: hi\ndata: 1\n\n'); // seems to ensure the 'open' event is fired?
 				pushChan = new BroadcastChannel(token);
 				pushChan.onmessage = (evt) => {
 					if (evt.data.exclude !== browserToken) ctrl.enqueue('event: sync\ndata: 1\n\n');
