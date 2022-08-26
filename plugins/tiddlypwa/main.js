@@ -735,7 +735,7 @@ Formatted with `deno fmt`.
 				};
 				this.logger.log('remote change', thash);
 				if (changedKeys.has(thash)) {
-					const ourtid = txn.objectStore('tiddlers').get(tid.thash);
+					const ourtid = await adb(txn.objectStore('tiddlers').get(tid.thash));
 					this.logger.log('conflict:', thash, 'server:', tid.mtime, 'local:', ourtid.mtime);
 					if (ourtid.mtime > tid.mtime) {
 						continue;
