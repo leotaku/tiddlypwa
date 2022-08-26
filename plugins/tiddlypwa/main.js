@@ -77,6 +77,7 @@ Formatted with `deno fmt`.
 			this.changesChannel = new BroadcastChannel(`tiddlypwa-changes:${location.pathname}`);
 			this.changesChannel.onmessage = (evt) => {
 				if (evt.data.title === '$:/StoryList') return; // don't mess with viewing different things in multiple tabs
+				this.logger.log('Change from another tab', evt.data);
 				if (evt.data.del) {
 					this.deletedQueue.add(evt.data.title);
 				} else {
@@ -757,15 +758,19 @@ Formatted with `deno fmt`.
 			for (const title of $tw.wiki.allTitles()) {
 				if (titleHashesToDelete.has(await b64enc(await this.titlehash(title)))) {
 					this.deletedQueue.add(title);
+					this.changesChannel.postMessage({ title, del: true });
 				}
 			}
 			for (const { title, iv } of titlesToRead) {
-				const dectitle = await crypto.subtle.decrypt(
-					{ name: 'AES-GCM', iv },
-					this.key,
-					title,
-				);
-				this.modifiedQueue.add(utfdec.decode(dectitle).trimStart());
+				const dectitle = utfdec.decode(
+					await crypto.subtle.decrypt(
+						{ name: 'AES-GCM', iv },
+						this.key,
+						title,
+					),
+				).trimStart();
+				this.modifiedQueue.add(dectitle);
+				this.changesChannel.postMessage({ title: dectitle });
 			}
 			if (appEtag && navigator.serviceWorker.controller) {
 				const cache = await caches.open('tiddlypwa');
