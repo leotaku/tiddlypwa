@@ -71,6 +71,7 @@ Formatted with `deno fmt`.
 		constructor(options) {
 			this.wiki = options.wiki;
 			this.logger = new $tw.utils.Logger('tiddlypwa-storage');
+			this.monitorTimeout = 2000;
 			this.modifiedQueue = new Set();
 			this.deletedQueue = new Set();
 			this.changesChannel = new BroadcastChannel(`tiddlypwa-changes:${location.pathname}`);
@@ -100,7 +101,10 @@ Formatted with `deno fmt`.
 			);
 			window.addEventListener(
 				'online',
-				(_evt) => this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: 'yes' }),
+				(_evt) => {
+					this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: 'yes' });
+					this.startRealtimeMonitor();
+				},
 			);
 
 			$tw.rootWidget.addEventListener('tiddlypwa-init', (_evt) => {
@@ -205,7 +209,59 @@ Formatted with `deno fmt`.
 			});
 		}
 
+		async _startRealtimeMonitor() {
+			const servers = await adb(
+				this.db.transaction('syncservers').objectStore('syncservers').getAll(),
+			);
+			if (servers.length === 0) return;
+			const server = servers[~~(Math.random() * servers.length)];
+			this.wiki.addTiddler({
+				title: '$:/status/TiddlyPWARealtime',
+				text: `connecting to ${server.url}`,
+			});
+			const url = new URL(server.url);
+			url.searchParams.set('op', 'monitor');
+			url.searchParams.set('token', server.token);
+			url.searchParams.set('browserToken', this.browserToken);
+			this.monitorStream = new EventSource(url.href);
+			this.monitorStream.onopen = (_e) => {
+				this.monitorTimeout = 2000;
+				this.wiki.addTiddler({
+					title: '$:/status/TiddlyPWARealtime',
+					text: `connected to ${server.url}`,
+				});
+			};
+			this.monitorStream.addEventListener('sync', (_evt) => this.backgroundSync());
+			await new Promise((resolve) => {
+				this.monitorStream.onerror = resolve;
+			});
+			this.wiki.addTiddler({
+				title: '$:/status/TiddlyPWARealtime',
+				text: `disconnected from ${server.url}`,
+			});
+			this.monitorStream.close();
+			this.startedMonitor = false;
+			if (navigator.onLine) this.startRealtimeMonitor();
+		}
+
+		startRealtimeMonitor() {
+			if (this.startedMonitor) return;
+			this.startedMonitor = true;
+			if (this.monitorTimeout < 60000) this.monitorTimeout *= 2;
+			clearTimeout(this.monitorTimer);
+			this.monitorTimer = setTimeout(async () => {
+				if (!navigator.locks) {
+					this._startRealtimeMonitor();
+				}
+				navigator.locks.request(
+					`tiddlypwa-realtime:${location.pathname}`,
+					(_lck) => this._startRealtimeMonitor(),
+				);
+			}, this.monitorTimeout);
+		}
+
 		reflectSyncServers() {
+			this.startRealtimeMonitor();
 			for (const tidname of this.wiki.getTiddlersWithTag('$:/temp/TiddlyPWAServer')) {
 				this.wiki.deleteTiddler(tidname);
 			}
@@ -316,6 +372,9 @@ Formatted with `deno fmt`.
 		}
 
 		async _getStatus() {
+			if (!this.browserToken) {
+				this.browserToken = await b64enc(crypto.getRandomValues(new Uint8Array(12)));
+			}
 			if (!this.db) {
 				const req = indexedDB.open(`tiddlypwa:${location.pathname}`, 1);
 				req.onupgradeneeded = (evt) => {
@@ -550,7 +609,14 @@ Formatted with `deno fmt`.
 						headers: {
 							'Content-Type': 'application/json',
 						},
-						body: JSON.stringify({ tiddlypwa: 1, op: 'uploadapp', token, apphtml, swjs }),
+						body: JSON.stringify({
+							tiddlypwa: 1,
+							op: 'uploadapp',
+							token,
+							browserToken: this.browserToken,
+							apphtml,
+							swjs,
+						}),
 					}).then((resp) => [url, resp])
 				));
 				const urls = [];
@@ -638,6 +704,7 @@ Formatted with `deno fmt`.
 					tiddlypwa: 1,
 					op: 'sync',
 					token,
+					browserToken: this.browserToken,
 					authcode: await b64enc(await this.titlehash(token)),
 					now,
 					lastSync,

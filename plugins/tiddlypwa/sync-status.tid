@@ -9,6 +9,8 @@ title: $:/plugins/valpackett/tiddlypwa/sync-status
 ''Currently syncing'' with {{$:/status/TiddlyPWASyncingWith}}, <$button message="tiddlypwa-sync-cancel">cancel</$button>?
 </$reveal>
 
+Live updates: {{$:/status/TiddlyPWARealtime}}.
+
 <$reveal type="match" state="$:/status/TiddlyPWAOnline" text="no">
 (Seems like you are currently ''offline'' so sync won't work right now.)
 </$reveal>
