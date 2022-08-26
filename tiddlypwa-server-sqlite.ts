@@ -67,6 +67,7 @@ const upsertQuery = db.prepareQuery(`
 	iv = excluded.iv,
 	mtime = excluded.mtime,
 	deleted = excluded.deleted
+	WHERE excluded.mtime > mtime
 `);
 
 const apiPat = new URLPattern({ pathname: '/tid.dly' });
