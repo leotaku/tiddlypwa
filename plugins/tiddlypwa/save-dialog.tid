@@ -6,7 +6,7 @@ title: $:/plugins/valpackett/tiddlypwa/save-dialog
 <thead>
     <tr>
         <td>Server</td>
-        <td>Last successful sync</td>
+        <td>Last synced change</td>
     </tr>
 </thead>
 <$list filter="[tag[$:/temp/TiddlyPWAServer]]">

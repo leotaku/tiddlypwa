@@ -53,7 +53,7 @@ This device syncs wiki contents with the following servers:
 <thead>
     <tr>
         <td>Server</td>
-        <td>Last successful sync</td>
+        <td>Last synced change</td>
         <td></td>
     </tr>
 </thead>

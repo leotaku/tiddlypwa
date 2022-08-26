@@ -538,10 +538,9 @@ Formatted with `deno fmt`.
 				return;
 			}
 			this._saveTiddler(tiddler).then((_) => {
-				const now = new Date();
 				cb(null, '', 1);
 				this.changesChannel.postMessage({ title: tiddler.fields.title });
-				this.backgroundSync(now);
+				this.backgroundSync();
 			}).catch((e) => cb(e));
 		}
 
@@ -581,10 +580,9 @@ Formatted with `deno fmt`.
 
 		deleteTiddler(title, cb, _options) {
 			this._deleteTiddler(title).then((_) => {
-				const now = new Date();
 				cb(null);
 				this.changesChannel.postMessage({ title, del: true });
-				this.backgroundSync(now);
+				this.backgroundSync();
 			}).catch((e) => cb(e));
 		}
 
@@ -660,8 +658,8 @@ Formatted with `deno fmt`.
 			}
 		}
 
-		async _syncOneUnlocked({ url, token, lastSync = new Date(0) }, all = false, now = new Date()) {
-			this.logger.log('sync started', url, lastSync, all, now);
+		async _syncOneUnlocked({ url, token, lastSync = new Date(0) }, all = false) {
+			this.logger.log('sync started', url, lastSync, all);
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncingWith', text: url });
 			const changes = [];
 			await new Promise((resolve) =>
@@ -678,8 +676,12 @@ Formatted with `deno fmt`.
 			);
 			const clientChanges = [];
 			const changedKeys = new Set();
+			let newestChg = new Date(0);
 			for (const { thash, title, tiv, data, iv, mtime, deleted } of changes) {
 				if (arrayEq(thash, this.storyListHash)) continue;
+				if (mtime > newestChg) {
+					newestChg = mtime;
+				}
 				const tidjson = {
 					thash: await b64enc(thash),
 					title: await b64enc(title),
@@ -706,7 +708,7 @@ Formatted with `deno fmt`.
 					token,
 					browserToken: this.browserToken,
 					authcode: await b64enc(await this.titlehash(token)),
-					now,
+					now: new Date(), // only for a desync check
 					lastSync,
 					clientChanges,
 				}),
@@ -748,6 +750,9 @@ Formatted with `deno fmt`.
 				} else {
 					titlesToRead.push({ title: tid.title, iv: tid.tiv });
 				}
+				if (tid.mtime > newestChg) {
+					newestChg = tid.mtime;
+				}
 			}
 			for (const title of $tw.wiki.allTitles()) {
 				if (titleHashesToDelete.has(await b64enc(await this.titlehash(title)))) {
@@ -772,11 +777,14 @@ Formatted with `deno fmt`.
 					navigator.serviceWorker.controller.postMessage({ op: 'update', url: req.url });
 				}
 			}
-			this.logger.log('sync done', url, now);
-			return now;
+			this.logger.log('sync done', url);
+			if (lastSync > newestChg) {
+				newestChg = lastSync;
+			}
+			return newestChg;
 		}
 
-		async _syncManyUnlocked(all, now) {
+		async _syncManyUnlocked(all) {
 			const servers = [];
 			await new Promise((resolve) =>
 				this.db.transaction('syncservers').objectStore('syncservers').openCursor().onsuccess = (evt) => {
@@ -790,7 +798,7 @@ Formatted with `deno fmt`.
 			);
 			for (const [key, server] of servers) {
 				try {
-					server.lastSync = await this._syncOneUnlocked(server, all, now);
+					server.lastSync = await this._syncOneUnlocked(server, all);
 					await adb(this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put(server, key));
 				} catch (e) {
 					if (e.name !== 'AbortError') {
@@ -805,7 +813,7 @@ Formatted with `deno fmt`.
 			this.isSyncing = false;
 		}
 
-		sync(all, now) {
+		sync(all) {
 			if (this.isSyncing) {
 				return;
 			}
@@ -813,16 +821,16 @@ Formatted with `deno fmt`.
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncing', text: 'yes' });
 			if (!navigator.locks) {
 				// welp, using multiple tabs without Web Locks is dangerous, but we can only YOLO it in this case
-				return this._syncManyUnlocked(all, now);
+				return this._syncManyUnlocked(all);
 			}
-			return navigator.locks.request(`tiddlypwa:${location.pathname}`, (_lck) => this._syncManyUnlocked(all, now));
+			return navigator.locks.request(`tiddlypwa:${location.pathname}`, (_lck) => this._syncManyUnlocked(all));
 		}
 
-		backgroundSync(now) {
+		backgroundSync() {
 			if (!navigator.onLine) return;
 			// debounced to handle multiple saves in quick succession
 			clearTimeout(this.syncTimer);
-			this.syncTimer = setTimeout(() => this.sync(false, now), 1000);
+			this.syncTimer = setTimeout(() => this.sync(false), 1000);
 		}
 	}
 
