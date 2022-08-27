@@ -274,6 +274,9 @@ function handleDbFile(pattern: URLPattern, req: Request, query: any, ctype: stri
 		return preflightResp('GET, HEAD, OPTIONS');
 	}
 	let [body, etag] = res[0];
+	if (!body) {
+		return Response.json({}, { status: 404 });
+	}
 	const [supportsBrotli, etagstr] = processEtag(etag, req.headers);
 	// if we decomress and Deno recompresses to something else (gzip) it'll mark the ETag as a weak validator
 	const headers = new Headers({
@@ -283,10 +286,7 @@ function handleDbFile(pattern: URLPattern, req: Request, query: any, ctype: stri
 		'etag': etagstr,
 	});
 	if (req.headers.get('if-none-match') === etagstr) {
-		return new Response(null, {
-			status: 304,
-			headers,
-		});
+		return new Response(null, { status: 304, headers });
 	}
 	if (supportsBrotli) {
 		headers.set('content-encoding', 'br');
