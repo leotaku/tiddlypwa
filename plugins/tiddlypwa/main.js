@@ -639,11 +639,21 @@ Formatted with `deno fmt`.
 						// The ServiceWorker will refetch from the server in the background again,
 						// so this should not cause any trouble. E.g. a concurrent update that
 						// happened in between upload and refresh would arrive as a new refresh prompt.
+						// The ETag is generated in a way that matches the reference server (assuming Brotli is working).
+						// If the ETag is different, sync will notice the mismatch and request the worker to reload.
 						try {
 							const cache = await caches.open('tiddlypwa');
 							for (const req of await cache.keys()) {
 								if (req.url === href) {
-									cache.put(req, new Response(apphtml, { headers: { 'content-type': 'text/html;charset=utf-8' } }));
+									cache.put(
+										req,
+										new Response(apphtml, {
+											headers: {
+												'content-type': 'text/html;charset=utf-8',
+												'etag': `"${await b64enc(await crypto.subtle.digest('SHA-1', utfenc.encode(apphtml)))}-b"`,
+											},
+										}),
+									);
 								}
 							}
 						} catch (e) {
