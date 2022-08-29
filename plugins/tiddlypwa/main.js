@@ -349,6 +349,7 @@ Formatted with `deno fmt`.
 			if (!hasStoryList) {
 				this.loadedStoryList = true; // not truly "loaded" but as in "enable saving it to the DB"
 			}
+			this.backgroundSync();
 			return true;
 		}
 
@@ -540,8 +541,10 @@ Formatted with `deno fmt`.
 			}
 			this._saveTiddler(tiddler).then((_) => {
 				cb(null, '', 1);
-				this.changesChannel.postMessage({ title: tiddler.fields.title });
-				this.backgroundSync();
+				if (tiddler.fields.title !== '$:/StoryList') {
+					this.changesChannel.postMessage({ title: tiddler.fields.title });
+					this.backgroundSync();
+				}
 			}).catch((e) => cb(e));
 		}
 
