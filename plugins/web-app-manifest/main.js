@@ -68,6 +68,7 @@ Formatted with `deno fmt`.
 			$tw.__tiddlypwa_manifest__ = json;
 		}
 
+		$tw.__update_tiddlypwa_manifest__ = render;
 		render();
 		$tw.wiki.addEventListener('change', (chg) => {
 			if (Object.keys(chg).some(isTiddlerRelevant)) {

@@ -350,6 +350,11 @@ Formatted with `deno fmt`.
 				this.loadedStoryList = true; // not truly "loaded" but as in "enable saving it to the DB"
 			}
 			this.backgroundSync();
+			setTimeout(() => {
+				try {
+					$tw.__update_tiddlypwa_manifest__();
+				} catch (_e) {}
+			}, 300);
 			return true;
 		}
 
