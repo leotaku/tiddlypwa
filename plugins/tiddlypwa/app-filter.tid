@@ -1,3 +1,3 @@
 title: $:/plugins/valpackett/tiddlypwa/app-filter
 
--[is[tiddler]] [[$:/core]] [[$:/favicon.ico]] [[$:/SiteTitle]] [[$:/SiteSubtitle]] [[$:/language]] [[$:/theme]] [[$:/palette]] [prefix[$:/themes/]] [prefix[$:/plugins/]]
+-[is[tiddler]] [[$:/core]] [[$:/favicon.ico]] [[$:/SiteTitle]] [[$:/SiteSubtitle]] [[$:/language]] [[$:/theme]] [[$:/palette]] [prefix[$:/themes/]] [prefix[$:/plugins/]] [prefix[$:/languages/]]
