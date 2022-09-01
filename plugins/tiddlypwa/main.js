@@ -67,6 +67,10 @@ Formatted with `deno fmt`.
 		return av.every((val, i) => val === bv[i]);
 	}
 
+	function isCurrentUrl(url) {
+		return url === `${location.origin}${location.pathname}${location.search}`;
+	}
+
 	class PWAStorage {
 		constructor(options) {
 			this.wiki = options.wiki;
@@ -638,7 +642,7 @@ Formatted with `deno fmt`.
 						continue;
 					}
 					const href = new URL((await resp.json()).url, url).href;
-					const isCurrent = href === document.location.href;
+					const isCurrent = isCurrentUrl(href);
 					urls.push(
 						href + (isCurrent ? ' {{$:/plugins/valpackett/tiddlypwa/cur-page-reload}}' : ''),
 					);
@@ -793,7 +797,7 @@ Formatted with `deno fmt`.
 			if (appEtag && navigator.serviceWorker.controller) {
 				const cache = await caches.open('tiddlypwa');
 				for (const req of await cache.keys()) {
-					if (req.url !== document.location.href) continue;
+					if (!isCurrentUrl(req.url)) continue;
 					const resp = await cache.match(req);
 					const cachedEtag = resp.headers.get('etag');
 					if (!cachedEtag || cachedEtag === appEtag) continue;
