@@ -527,7 +527,8 @@ Formatted with `deno fmt`.
 					tiv,
 					data,
 					iv,
-					mtime: tiddler.fields.modified || new Date(), // Has to be unencrypted for sync conflict resolution
+					mtime: new Date(), // Has to be unencrypted for sync conflict resolution
+					// also, *not* using the tiddler's modified field allows for importing tiddlers last modified in the past
 				}),
 			);
 			await this.reflectStorageInfo();
