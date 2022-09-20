@@ -255,6 +255,7 @@ function preflightResp(methods: string) {
 			...respHdrs,
 			'access-control-allow-methods': methods,
 			'access-control-allow-headers': '*',
+			'access-control-max-age': '86400',
 		},
 		status: 204,
 	});
