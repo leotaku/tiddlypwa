@@ -4,6 +4,160 @@ import * as base64 from 'https://deno.land/std@0.159.0/encoding/base64.ts';
 import * as brotli from 'https://deno.land/x/brotli@0.1.7/mod.ts';
 import { DB } from 'https://deno.land/x/sqlite@v3.7.0/mod.ts';
 
+const html = String.raw; // just for tools/editors
+const homePage = html`
+	<!doctype html>
+	<html lang=en>
+		<head>
+			<meta charset=utf-8>
+			<title>TiddlyPWA Sync Server Control Panel</title>
+			<style>
+				* { box-sizing: border-box; }
+				html { background: #252525; color: #fbfbfb; -webkit-text-size-adjust: none; text-size-adjust: none; accent-color: limegreen; }
+				body { margin: 2rem auto; min-width: 300px; max-width: 70ch; line-height: 1.5; word-wrap: break-word; font-family: system-ui, sans-serif; }
+				a { color: limegreen; }
+				a:hover { color: lime; }
+				h1 { font: 1.25rem monospace; text-align: center; color: limegreen; margin-bottom: 2rem; }
+				h2 { font-size: 1.15rem; margin: 1rem 0; }
+				fieldset { border: none; text-align: center; }
+				thead { font-weight: bolder; background: rgba(0,240,0,.1); }
+				footer { text-align: center; margin-top: 2rem; }
+				table { border-collapse: collapse; margin: 1rem 0; }
+				td { padding: 0.25rem 0.6rem; }
+				tr:nth-child(even) { background: rgba(255,255,255,.08); }
+				#wikirows td:first-of-type { font-family: monospace; }
+			</style>
+		</head>
+		<body>
+			<h1>TiddlyPWA Sync Server Control Panel</h1>
+			<noscript>Enable JavaScript!</noscript>
+			<form id=login>
+				<fieldset>
+					<input type=password id=atoken>
+					<button>Log in</button>
+				</fieldset>
+			</form>
+			<div id=loggedin hidden>
+				<h2>Wikis on the server:</h2>
+				<table>
+					<thead>
+						<tr>
+							<td>Token</td>
+							<td>Tiddlers Size</td>
+							<td>App Wiki Size</td>
+							<td></td>
+						</tr>
+					</thead>
+					<tbody id=wikirows>
+					</tbody>
+				</table>
+				<button id=refresh>Refresh</button>
+				<button id=create>Create new wiki</button>
+			</div>
+			<footer>
+				<a href=https://tiddly.packett.cool/>TiddlyPWA</a> sync server ✦ software by <a href=https://val.packett.cool/>Val Packett</a>
+			</footer>
+			<script>
+				const knownErrors = {
+					EAUTH: 'Wrong token',
+				};
+				function formatBytes(bytes) {
+					const sizes = ['bytes', 'KiB', 'MiB', 'GiB', 'TiB'];
+					const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+					if (i >= sizes.length) return 'too much';
+					return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+				}
+				async function serverReq(data) {
+					const resp = await fetch('tid.dly', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							tiddlypwa: 1,
+							atoken: document.getElementById('atoken').value,
+							...data,
+						}),
+					});
+					if (!resp.ok) {
+						alert(await resp.json().then(({ error }) => knownErrors[error] || error).catch((_e) =>
+							'Server returned error ' + resp.status
+						));
+						return false;
+					}
+					return resp;
+				}
+				async function refreshTokens() {
+					const resp = await serverReq({ op: 'list' });
+					if (!resp) return false;
+					const { wikis } = await resp.json();
+					const wikirows = document.getElementById('wikirows')
+					wikirows.replaceChildren();
+					for (const { token, appsize, tidsize } of wikis) {
+						const tr = document.createElement('tr');
+						const tokenTd = document.createElement('td');
+						tokenTd.innerText = token;
+						tr.appendChild(tokenTd);
+						const tidsizeTd = document.createElement('td');
+						tidsizeTd.innerText = tidsize ? formatBytes(tidsize) : '-';
+						tr.appendChild(tidsizeTd);
+						const appsizeTd = document.createElement('td');
+						if (appsize > 0) {
+							const appsizeA = document.createElement('a');
+							appsizeA.href = '/' + token.slice(0, token.length / 2) + '/app.html';
+							appsizeA.innerText = formatBytes(appsize);
+							appsizeTd.appendChild(appsizeA);
+						} else {
+							appsizeTd.innerText = '-';
+						}
+						tr.appendChild(appsizeTd);
+						const btnsTd = document.createElement('td');
+						const btnDel = document.createElement('button');
+						btnDel.innerText = 'Delete';
+						btnDel.onclick = (e) => {
+							if (!confirm('Do you really want to delete the wiki with token ' + token + '?')) return;
+							serverReq({ op: 'delete', token }).then(() => document.getElementById('refresh').click());
+						};
+						btnsTd.appendChild(btnDel);
+						tr.appendChild(btnsTd);
+						wikirows.appendChild(tr);
+					}
+					return true;
+				}
+				window.addEventListener('DOMContentLoaded', (_) => {
+					const loginForm = document.getElementById('login');
+					loginForm.onsubmit = (e) => {
+						e.preventDefault();
+						loginForm.querySelector('fieldset').disabled = true;
+						refreshTokens().then((suc) => {
+							document.getElementById('loggedin').hidden = !suc;
+							loginForm.hidden = suc;
+							loginForm.querySelector('fieldset').disabled = suc;
+						}).catch((e) => {
+							console.error(e);
+							alert('Unexpected error!');
+							loginForm.querySelector('fieldset').disabled = false;
+						});
+					};
+					const refreshBtn = document.getElementById('refresh');
+					const createBtn = document.getElementById('create');
+					refreshBtn.onclick = () => {
+						refreshBtn.disabled = createBtn.disabled = true;
+						refreshTokens().then(() => {
+							refreshBtn.disabled = createBtn.disabled = false;
+						}).catch((e) => {
+							console.error(e);
+							alert('Unexpected error!');
+							refreshBtn.disabled = createBtn.disabled = false;
+						});
+					};
+					createBtn.onclick = () => {
+						serverReq({ op: 'create' }).then(() => refreshBtn.click());
+					}
+				});
+			</script>
+		</body>
+	</html>
+`;
+
 const args = argparse(Deno.args);
 const admintoken = (args.admintoken || Deno.env.get('ADMIN_TOKEN'))?.trim();
 const db = new DB(args.db || Deno.env.get('SQLITE_DB') || '.data/tiddly.db');
@@ -70,6 +224,16 @@ const upsertQuery = db.prepareQuery(`
 	WHERE excluded.mtime > mtime
 `);
 
+const listQuery = db.prepareQuery<[string, number, number]>(`
+	SELECT token, length(apphtml) + length(swjs) AS appsize, (
+		SELECT sum(length(thash) + length(title) + length(tiv) + length(data) + length(iv))
+		FROM tiddlers
+		WHERE wiki = id
+	) AS tidsize
+	FROM wikis
+`);
+
+const homePat = new URLPattern({ pathname: '/' });
 const apiPat = new URLPattern({ pathname: '/tid.dly' });
 const apphtmlPat = new URLPattern({ pathname: '/:halftoken/app.html' });
 const swjsPat = new URLPattern({ pathname: '/:halftoken/sw.js' });
@@ -163,6 +327,17 @@ function handleSync(
 	// assuming here that the browser would use the same Accept-Encoding as when requesting the page
 	const [_, appEtag] = processEtag(apphtmletag, headers);
 	return Response.json({ serverChanges, appEtag }, { headers: respHdrs });
+}
+
+function handleList({ atoken }: { atoken: any }) {
+	if (typeof atoken !== 'string') {
+		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
+	}
+	if (atoken !== admintoken) {
+		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
+	}
+	const wikis = listQuery.allEntries();
+	return Response.json({ wikis }, { headers: respHdrs, status: 201 });
 }
 
 function handleCreate({ atoken }: { atoken: any }) {
@@ -309,6 +484,7 @@ async function handleApiEndpoint(req: Request) {
 			return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 		}
 		if (data.op === 'sync') return handleSync(data, req.headers);
+		if (data.op === 'list') return handleList(data);
 		if (data.op === 'create') return handleCreate(data);
 		if (data.op === 'delete') return handleDelete(data);
 		if (data.op === 'uploadapp') return await handleUploadApp(data);
@@ -320,10 +496,28 @@ async function handleApiEndpoint(req: Request) {
 	return Response.json({ error: 'EPROTO' }, { status: 405, headers: { ...respHdrs, 'allow': 'OPTIONS, POST, GET' } });
 }
 
+function handleHomePage(req: Request) {
+	if (!homePat.exec(req.url)) return null;
+	if (req.method !== 'GET' && req.method !== 'HEAD') {
+		return new Response(null, { status: 405, headers: { 'allow': 'GET, HEAD' } });
+	}
+	const headers = new Headers({
+		'content-type': 'text/html;charset=utf-8',
+		'content-length': homePage.length.toString(),
+		'cache-control': 'no-cache',
+		'x-content-type-options': 'nosniff',
+		'x-frame-options': 'SAMEORIGIN',
+		'content-security-policy':
+			'default-src \'self\'; script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\';',
+	});
+	return new Response(req.method === 'HEAD' ? null : homePage, { headers });
+}
+
 async function handle(req: Request) {
 	return await handleDbFile(apphtmlPat, req, apphtmlQuery, 'text/html;charset=utf-8') ||
 		await handleDbFile(swjsPat, req, swjsQuery, 'text/javascript;charset=utf-8') ||
 		await handleApiEndpoint(req) ||
+		handleHomePage(req) ||
 		Response.json({}, { headers: respHdrs, status: 404 });
 }
 
