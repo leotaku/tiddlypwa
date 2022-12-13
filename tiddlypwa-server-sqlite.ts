@@ -1,8 +1,8 @@
-import { serveListener } from 'https://deno.land/std@0.150.0/http/server.ts';
-import { parse as argparse } from 'https://deno.land/std@0.150.0/flags/mod.ts';
-import * as base64 from 'https://deno.land/std@0.150.0/encoding/base64.ts';
-import * as brotli from 'https://deno.land/x/brotli@v0.1.4/mod.ts';
-import { DB } from 'https://deno.land/x/sqlite@v3.4.0/mod.ts';
+import { serveListener } from 'https://deno.land/std@0.159.0/http/server.ts';
+import { parse as argparse } from 'https://deno.land/std@0.159.0/flags/mod.ts';
+import * as base64 from 'https://deno.land/std@0.159.0/encoding/base64.ts';
+import * as brotli from 'https://deno.land/x/brotli@0.1.7/mod.ts';
+import { DB } from 'https://deno.land/x/sqlite@v3.7.0/mod.ts';
 
 const args = argparse(Deno.args);
 const admintoken = (args.admintoken || Deno.env.get('ADMIN_TOKEN'))?.trim();
