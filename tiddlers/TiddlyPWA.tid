@@ -1,24 +1,59 @@
 title: TiddlyPWA
 tiddlypwa: noautodb
 
-TiddlyPWA is a suite of plugins and tools that turn [[TiddlyWiki 5|https://tiddlywiki.com]]
+Welcome! ~TiddlyPWA turns [[TiddlyWiki 5|https://tiddlywiki.com]]
 into an ''offline-first'' [[Progressive Web App|https://web.dev/learn/pwa/progressive-web-apps/]]
 with ''encrypted'' local persistent storage and efficient ''synchronization'' with a server
 application that can easily be hosted for free.
 
+!! How it works
+
+You have an instance of ~TiddlyWiki with the ~TiddlyPWA plugin running in the browser.
+The wiki HTML file is called the "app wiki" because it only contains plugins and basic settings.
+The loaded plugin stores tiddlers in the browser via ~IndexedDB, scoped to the URL you're running the wiki from.
+They are encrypted at rest with a key derived from a password,
+which you can remember if you don't need to protect your data against anything/anyone with access to the browser.
+
+The plugin can also synchronize your tiddlers with one or more sync servers, which you can specify in the settings.
+On a sync server, a particular wiki is identified by a token, which is like a password
+(but it's used on its own, without anything like a username).
+These tokens are created in the server's admin interface.
+To start syncing the same wiki to a second browser (device) you need to open the app wiki there,
+start with the same encryption password, and add the same sync server URL and sync token.
+
+The server can also store the app wiki HTML, which makes it really easy to install plugins:
+the plugin will be able to generate and store a new version of the app wiki and directly reload into it.
+The downside is that the server has to be trusted not to deliver you a backdoored version of the app wiki,
+however we'll be able to somewhat improve on that by making it "trust on first use" with signatures.
+
+!! How to try it out
+
 You can <$button message="tiddlypwa-init">start using ~TiddlyPWA</$button> on this page right now!
-This will reload the page, and you will be asked for a password.
+(But first, open this page in private mode or another browser to keep reading the documentation.)
+
+This will reload the page with ~TiddlyPWA activated, and you will be asked for a password.
 If you do not yet have one, make one up!
-Note that you must to use the same password on all TiddlyPWA instances you'd want to sync between.
+You must to use the same password on all ~TiddlyPWA instances you'd want to sync between.
+
+At this point, your notes would only be stored in your browser, belonging to the web address you've opened TiddlyPWA from.
+
+!! How to set it up with a sync server
+
+!! How to customize the client app wiki or update the plugin
+
+
+-----------------
 
 <details>
-<summary>Upload this version to any sync server…</summary>
+<summary>Upload this running client app wiki to a sync server…</summary>
+
 {{$:/plugins/valpackett/tiddlypwa/upload-app-form}}
-</details>
 
 {{$:/status/TiddlyPWAUploadResult}}
+</details>
 
-!! Hosting a custom instance
+<details>
+<summary>Create a new client app wiki manually</summary>
 
 First, either start with this page or add the following plugins to a fresh TiddlyWiki file:
 
@@ -35,3 +70,5 @@ if you can live with those being unencrypted.
 Now save the wiki HTML file and upload it to a good static file host along with
 a very important [[sw.js|$:/plugins/valpackett/tiddlypwa-offline/sw.js]] file
 that must reside in the same directory.
+
+</details>

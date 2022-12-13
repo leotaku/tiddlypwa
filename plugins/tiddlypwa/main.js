@@ -445,14 +445,14 @@ Formatted with `deno fmt`.
 						['deriveKey'],
 					);
 					this.key = await crypto.subtle.deriveKey(
-						{ name: 'PBKDF2', hash: 'SHA-256', iterations: 100000, salt: utfenc.encode('tiddlytiddlers') },
+						{ name: 'PBKDF2', hash: 'SHA-512', iterations: 1000000, salt: utfenc.encode('tiddlytiddlers') },
 						pwdk,
 						{ name: 'AES-GCM', length: 256 },
 						false,
 						['encrypt', 'decrypt'],
 					);
 					this.mackey = await crypto.subtle.deriveKey(
-						{ name: 'PBKDF2', hash: 'SHA-256', iterations: 100000, salt: utfenc.encode('tiddlyhmac') },
+						{ name: 'PBKDF2', hash: 'SHA-512', iterations: 1000000, salt: utfenc.encode('tiddlyhmac') },
 						pwdk,
 						{ name: 'HMAC', hash: 'SHA-256' },
 						false,
