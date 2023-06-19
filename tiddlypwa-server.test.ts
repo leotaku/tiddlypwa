@@ -1,3 +1,4 @@
+// DB_PATH=:memory: ADMIN_PASSWORD_HASH=aU0v10QsB2HdeRzDvLhrWaC78Bo15GxmlKV0CUia1cU deno test --unstable --allow-env
 import { assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
 import * as app from './tiddlypwa-server.ts';
 
@@ -11,8 +12,8 @@ const api = (data: any) =>
 
 const page = (path: string) => app.handle(new Request('http://example.com/' + path));
 
-const createWiki = () => api({ op: 'create', atoken: app.admintoken }).then((x) => x.token as string);
-const deleteWiki = (token: string) => api({ op: 'delete', atoken: app.admintoken, token });
+const createWiki = () => api({ op: 'create', atoken: 'test' }).then((x) => x.token as string);
+const deleteWiki = (token: string) => api({ op: 'delete', atoken: 'test', token });
 const uploadAppFile = (token: string, body: string, extra?: object, file: string = 'app.html') =>
 	api({
 		op: 'uploadapp',

@@ -2,6 +2,8 @@ import * as base64 from 'https://deno.land/std@0.192.0/encoding/base64url.ts';
 import * as base64nourl from 'https://deno.land/std@0.192.0/encoding/base64.ts';
 import { parse as argparse } from 'https://deno.land/std@0.192.0/flags/mod.ts';
 import { serveListener } from 'https://deno.land/std@0.192.0/http/server.ts';
+import { timingSafeEqual } from 'https://deno.land/std@0.192.0/crypto/timing_safe_equal.ts';
+import * as argon from 'https://deno.land/x/argontwo@0.1.1/mod.ts';
 import * as brotli from 'https://deno.land/x/brotli@0.1.7/mod.ts';
 import * as blob from 'https://deno.land/x/kv_toolbox@0.0.2/blob.ts';
 
@@ -39,7 +41,7 @@ type Wiki = {
 const ALL_WIKI_PREFIX = ['w'];
 export const wikiKey = (token: string) => ['w', token.slice(0, token.length / 2), token.slice(token.length / 2)];
 const wikiKeyHalf = (halftoken: string) => ['w', halftoken];
-const tokenFromKey = (key: string[]) => key[1] + key[2];
+const tokenFromKey = (key: Deno.KvKey) => `${key[1]}${key[2]}`;
 
 const html = String.raw; // just for tools/editors
 const homePage = html`
@@ -192,7 +194,7 @@ const homePage = html`
 `;
 
 const args = argparse(Deno.args);
-export const admintoken = (args.admintoken || Deno.env.get('ADMIN_TOKEN'))?.trim();
+const adminpwhash = base64.decode((args.adminpwhash || Deno.env.get('ADMIN_PASSWORD_HASH'))?.trim());
 export const kv = await Deno.openKv(args.db || Deno.env.get('DB_PATH'));
 const utfenc = new TextEncoder();
 
@@ -201,6 +203,10 @@ const apiPat = new URLPattern({ pathname: '/tid.dly' });
 const appFilePat = new URLPattern({ pathname: '/:halftoken/:filename' });
 
 const respHdrs = { 'access-control-allow-origin': '*' };
+
+function adminPasswordCorrect(atoken: string) {
+	return timingSafeEqual(argon.hash(utfenc.encode(atoken), utfenc.encode('tiddlysyncserver')), adminpwhash);
+}
 
 function parseTime(x: number) {
 	const time = new Date();
@@ -292,7 +298,7 @@ async function handleList({ atoken }: any) {
 	if (typeof atoken !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	if (atoken !== admintoken) {
+	if (!adminPasswordCorrect(atoken)) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	const wikis = [];
@@ -309,7 +315,7 @@ async function handleCreate({ atoken }: any) {
 	if (typeof atoken !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	if (atoken !== admintoken) {
+	if (!adminPasswordCorrect(atoken)) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	const token = base64.encode(crypto.getRandomValues(new Uint8Array(32)));
@@ -317,7 +323,11 @@ async function handleCreate({ atoken }: any) {
 	return Response.json({ token }, { headers: respHdrs, status: 201 });
 }
 
-async function garbageCollectBlobs(token: string, oldfiles: Map<string, AppFile> | null, usedetags: Set<Uint8Array>) {
+async function garbageCollectBlobs(
+	token: string,
+	oldfiles: Map<string, AppFile> | undefined,
+	usedetags: Set<Uint8Array>,
+) {
 	if (!oldfiles) return;
 	for (const [filename, meta] of oldfiles) {
 		if (usedetags.has(meta.etag)) continue;
@@ -340,7 +350,7 @@ async function handleDelete({ atoken, token }: any) {
 	if (typeof atoken !== 'string' || typeof token !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	if (atoken !== admintoken) {
+	if (!adminPasswordCorrect(atoken)) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	const wiki = await kv.get<Wiki>(wikiKey(token));
@@ -466,7 +476,7 @@ async function handleAppFile(req: Request) {
 	if (req.method === 'OPTIONS') {
 		return preflightResp('GET, HEAD, OPTIONS');
 	}
-	const meta = wiki.value.value.files.get(filename);
+	const meta = wiki.value.value.files?.get(filename);
 	if (!meta) {
 		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
 	}
