@@ -108,18 +108,11 @@ Formatted with `deno fmt`.
 				'online',
 				(_evt) => {
 					this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: 'yes' });
-					this.startRealtimeMonitor();
+					if (this.db) {
+						this.startRealtimeMonitor();
+					}
 				},
 			);
-
-			$tw.rootWidget.addEventListener('tiddlypwa-init', (_evt) => {
-				const req = indexedDB.open(`tiddlypwa:${location.pathname}`, 1);
-				req.onupgradeneeded = (evt) => this.initDb(evt.target.result);
-				adb(req).then((_) => {
-					$tw.syncer.isDirty = () => false; // skip the onbeforeunload
-					location.reload();
-				});
-			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-remember', (_evt) => {
 				this.db.transaction('session', 'readwrite').objectStore('session').put({ key: this.key, mackey: this.mackey })
@@ -346,7 +339,6 @@ Formatted with `deno fmt`.
 					this.modifiedQueue.add(utfdec.decode(dectitle).trimStart());
 				} catch (e) {
 					this.logger.log('Title decrypt failed:', e);
-					$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-badpass');
 					return false;
 				}
 			}
@@ -389,26 +381,14 @@ Formatted with `deno fmt`.
 			if (!this.db) {
 				const req = indexedDB.open(`tiddlypwa:${location.pathname}`, 1);
 				req.onupgradeneeded = (evt) => {
-					const db = evt.target.result;
-					const introtid = this.wiki.getTiddler('TiddlyPWA');
-					if (introtid && introtid.fields.tiddlypwa === 'noautodb') {
-						evt.target.transaction.abort();
-						return;
-					}
-					this.initDb(db);
+					this.initDb(evt.target.result);
 				};
-				try {
-					this.db = await adb(req);
-				} catch (e) {
-					if (e.name === 'AbortError') {
-						this.wiki.addTiddler({ title: '$:/status/TiddlyPWADocsMode', text: 'yes' });
-						return;
-					}
-					throw e;
-				}
+				this.db = await adb(req);
 			}
-			await this.reflectSyncServers();
-			await this.reflectStorageInfo();
+			const freshDb = await new Promise((resolve) =>
+				this.db.transaction('tiddlers').objectStore('tiddlers').openCursor().onsuccess = (evt) =>
+					resolve(!evt.target.result)
+			);
 			if (!this.key) {
 				const ses = await adb(this.db.transaction('session').objectStore('session').getAll());
 				if (ses.length > 0) {
@@ -418,28 +398,144 @@ Formatted with `deno fmt`.
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: ses.length > 0 ? 'yes' : 'no' });
 			}
 			if (!this.key) {
-				const backdrop = document.createElement('div');
-				$tw.utils.addClass(backdrop, 'tc-modal-backdrop');
-				$tw.utils.setStyle(backdrop, [
-					{ opacity: '0.9' },
-				]);
-				document.body.appendChild(backdrop);
+				let bootstrapEndpoint;
+				$tw.utils.addClass($tw.pageContainer, 'tc-modal-displayed');
+				$tw.utils.addClass(document.body, 'tc-modal-prevent-scroll');
+				const dm = $tw.utils.domMaker;
+				const wrapper = dm('div', { class: 'tc-modal-wrapper', style: { 'z-index': 999999 } });
+				wrapper.appendChild(dm('div', { class: 'tc-modal-backdrop', style: { opacity: '0.9' } }));
+				const modal = dm('div', { class: 'tc-modal' });
+				modal.appendChild(dm('div', { class: 'tc-modal-header', innerHTML: '<h3>Welcome to TiddlyPWA</h3>' }));
+				const body = dm('div', { class: 'tc-modal-body' });
+				const form = dm('form', { class: 'tiddlypwa-form' });
+				const passLbl = dm('label', { innerHTML: 'Password' });
+				const passInput = dm('input', { attributes: { type: 'password' } });
+				passLbl.appendChild(passInput);
+				const submit = dm('button', { attributes: { type: 'submit' }, text: 'Log in' });
+				const feedback = dm('div', {});
+				modal.appendChild(body);
+				document.body.appendChild(wrapper);
+				let opened = false;
+				let timeoutModal;
+				const showForm = () => {
+					form.appendChild(passLbl);
+					form.appendChild(submit);
+					form.appendChild(feedback);
+					body.appendChild(form);
+				};
+				const openModal = () => {
+					if (opened) return;
+					opened = true;
+					wrapper.appendChild(modal);
+					clearTimeout(timeoutModal);
+				};
+				const closeModal = () => {
+					document.body.removeChild(wrapper);
+					$tw.utils.removeClass($tw.pageContainer, 'tc-modal-displayed');
+					$tw.utils.removeClass(document.body, 'tc-modal-prevent-scroll');
+					clearTimeout(timeoutModal);
+				};
+				if (freshDb) {
+					body.innerHTML =
+						'<p>No wiki data found in the browser storage for this URL. Wait a second, looking around the server..</p>';
+					const giveUp = new AbortController();
+					const timeoutGiveUpBtn = setTimeout(() =>
+						body.appendChild(dm('button', {
+							text: 'Give up waiting',
+							attributes: {
+								type: 'button',
+							},
+							eventListeners: [{
+								name: 'click',
+								handlerFunction: (e) => giveUp.abort(),
+							}],
+						})), 6900);
+					timeoutModal = setTimeout(openModal, 1000);
+					try {
+						const resp = await fetch('bootstrap.json', {
+							signal: giveUp.signal,
+							cache: 'no-store',
+						});
+						const { state, endpoint } = await resp.json();
+						if ((endpoint && typeof endpoint !== 'string') || (state && typeof state !== 'string')) {
+							alert('Something is weird with the server! Unexpected types in bootstrap.json');
+						}
+						bootstrapEndpoint = endpoint && { url: endpoint };
+						clearTimeout(timeoutGiveUpBtn);
+						let askToken = true;
+						if (state === 'docs') {
+							this.db.close();
+							closeModal();
+							$tw.syncer.isDirty = () => false; // skip the onbeforeunload
+							await adb(indexedDB.deleteDatabase(`tiddlypwa:${location.pathname}`));
+							this.db = undefined;
+							this.wiki.addTiddler({ title: '$:/status/TiddlyPWADocsMode', text: 'yes' });
+							return;
+						} else if (state === 'localonly') {
+							body.innerHTML = '<p>Welcome to your new local-only wiki!</p>';
+							body.innerHTML +=
+								'<p>This wiki is not hosted on a sync server and will not automatically start to synchronize your data. However, you can always add sync servers later in the settings!</p>';
+							body.innerHTML += '<p><strong>Make up a strong password</strong> to protect the content of the wiki.</p>';
+							askToken = false;
+						} else if (state === 'fresh') {
+							body.innerHTML = '<p>Welcome to your new synchronized wiki!</p>';
+							body.innerHTML +=
+								`<p>Paste the token given to you by the administrator of the sync server <code>${endpoint}</code> and <strong>make up a strong password</strong>.</p>`;
+							body.innerHTML +=
+								'<p>The password will be used to encrypt your data, hiding the content from the server and, if you choose not to use the "remember password" option, against unauthorized users of this device.</p>';
+							body.innerHTML +=
+								'<p>You will have to use that password to open this wiki on all synchronized devices/browsers.</p>';
+						} else if (state === 'existing') {
+							body.innerHTML = '<p>Welcome back to your synchronized wiki!</p>';
+							body.innerHTML +=
+								`<p>Log in using your credentials below. You are using the sync server <code>${endpoint}</code>.</p>`;
+						} else {
+							body.innerHTML = '<p>We are not quite sure what happened on the sync server...</p>';
+							body.innerHTML += `<p>Try to log in using your credentials below anyway?</p>`;
+						}
+						if (askToken) {
+							if (!bootstrapEndpoint) {
+								alert(`This sync server is misconfigured: no endpoint found while state is '${state}'.`);
+							}
+							const tokLbl = dm('label', { innerHTML: 'Sync token' });
+							tokLbl.appendChild(dm('input', {
+								attributes: { type: 'password' },
+								eventListeners: [{
+									name: 'change',
+									handlerFunction: (e) => bootstrapEndpoint.token = e.target.value.trim(),
+								}],
+							}));
+							form.appendChild(tokLbl);
+						}
+						showForm();
+						openModal();
+					} catch (e) {
+						clearTimeout(timeoutGiveUpBtn);
+						body.innerHTML = '<p>Oops, looks like there is no information about the current server to be found!</p>';
+						body.innerHTML += '<p>Oh well, synchronization can be set up later in the settings.</p>';
+						showForm();
+						openModal();
+					}
+				} else {
+					body.innerHTML = '<p>Welcome back! Please enter your password.</p>';
+					showForm();
+					openModal();
+				}
 				let checked = false;
 				while (!checked) {
-					const { password } = await new Promise((resolve, _reject) =>
-						$tw.passwordPrompt.createPrompt({
-							serviceName: 'Enter the wiki password',
-							submitText: 'Open',
-							noUserName: true,
-							callback: (data) => {
-								resolve(data);
-								return true;
-							},
-						})
-					);
+					submit.disabled = false;
+					await new Promise((resolve, _reject) => {
+						form.onsubmit = (e) => {
+							e.preventDefault();
+							submit.disabled = true;
+							feedback.innerHTML = '<p>Please wait…</p>';
+							resolve();
+						};
+					});
+					console.log(bootstrapEndpoint)
 					const pwdk = await crypto.subtle.importKey(
 						'raw',
-						utfenc.encode(password),
+						utfenc.encode(passInput.value),
 						{ name: 'PBKDF2' },
 						false,
 						['deriveKey'],
@@ -461,13 +557,26 @@ Formatted with `deno fmt`.
 					checked = await this.initialRead();
 					if (checked) {
 						$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-opened');
+					} else {
+						feedback.innerHTML += '<p class=tiddlypwa-form-error>Wrong password!</p>';
 					}
 				}
-				document.body.removeChild(backdrop);
+				closeModal();
+				if (bootstrapEndpoint) {
+					const { url, token } = bootstrapEndpoint;
+					await adb(
+						this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put({
+							url,
+							token,
+							lastSync: new Date(0),
+						}),
+					);
+				}
 			} else {
 				await this.initialRead();
 			}
-			this.wiki.deleteTiddler('TiddlyPWA');
+			await this.reflectSyncServers();
+			await this.reflectStorageInfo();
 		}
 
 		getStatus(cb) {
@@ -565,7 +674,7 @@ Formatted with `deno fmt`.
 		async _loadTiddler(title) {
 			const thash = await this.titlehash(title);
 			const obj = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').get(thash));
-			if (obj.deleted) return null; // XXX: investigate 'TiddlyPWA' default name tiddler getting synced as deleted on start
+			if (obj.deleted) return null;
 			const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.iv }, this.key, obj.data);
 			return JSON.parse(utfdec.decode(data).trimStart());
 		}

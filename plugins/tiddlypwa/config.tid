@@ -4,7 +4,6 @@ caption: Storage and Sync
 
 <$reveal type="match" state="$:/status/TiddlyPWADocsMode" text="yes">
 TiddlyPWA is running in documentation/installer mode.
-You can <$button message="tiddlypwa-init">start using ~TiddlyPWA</$button> on this page right now!
 </$reveal>
 
 <$reveal type="nomatch" state="$:/status/TiddlyPWADocsMode" text="yes">

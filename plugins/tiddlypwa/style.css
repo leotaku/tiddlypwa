@@ -1,0 +1,11 @@
+/*\
+title: $:/plugins/valpackett/tiddlypwa/style.css
+tags: $:/tags/Stylesheet
+type: text/css
+
+Licensed under 0BSD, see license.tid.
+\*/
+
+.tc-modal-wrapper { backdrop-filter: blur(3px); }
+.tiddlypwa-form input, .tiddlypwa-form button { display: block; width: 100%; margin: 0.5em 0; padding: 0.25em; }
+.tiddlypwa-form-error { color: #ee1111; font-weight: bolder; }

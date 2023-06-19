@@ -28,15 +28,6 @@ however we'll be able to somewhat improve on that by making it "trust on first u
 
 !! How to try it out
 
-You can <$button message="tiddlypwa-init">start using ~TiddlyPWA</$button> on this page right now!
-(But first, open this page in private mode or another browser to keep reading the documentation.)
-
-This will reload the page with ~TiddlyPWA activated, and you will be asked for a password.
-If you do not yet have one, make one up!
-You must to use the same password on all ~TiddlyPWA instances you'd want to sync between.
-
-At this point, your notes would only be stored in your browser, belonging to the web address you've opened TiddlyPWA from.
-
 !! How to set it up with a sync server
 
 !! How to customize the client app wiki or update the plugin
