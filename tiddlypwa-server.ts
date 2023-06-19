@@ -476,6 +476,10 @@ async function handleAppFile(req: Request) {
 	if (req.method === 'OPTIONS') {
 		return preflightResp('GET, HEAD, OPTIONS');
 	}
+	if (filename === 'bootstrap.json') {
+		const it = await (await kv.list<Tiddler>({ prefix: tiddlerKeyPrefix(tokenFromKey(wiki.value.key)) })).next();
+		return Response.json({ endpoint: '/tid.dly', state: it.done ? 'fresh' : 'existing' }, { headers: respHdrs });
+	}
 	const meta = wiki.value.value.files?.get(filename);
 	if (!meta) {
 		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
