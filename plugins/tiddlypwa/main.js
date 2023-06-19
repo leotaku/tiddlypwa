@@ -402,7 +402,8 @@ Formatted with `deno fmt`.
 				$tw.utils.addClass($tw.pageContainer, 'tc-modal-displayed');
 				$tw.utils.addClass(document.body, 'tc-modal-prevent-scroll');
 				const dm = $tw.utils.domMaker;
-				const wrapper = dm('div', { class: 'tc-modal-wrapper', style: { 'z-index': 999999 } });
+				// below alerts, above hide-sidebar-btn
+				const wrapper = dm('div', { class: 'tc-modal-wrapper', style: { 'z-index': 1500 } });
 				wrapper.appendChild(dm('div', { class: 'tc-modal-backdrop', style: { opacity: '0.9' } }));
 				const modal = dm('div', { class: 'tc-modal' });
 				modal.appendChild(dm('div', { class: 'tc-modal-header', innerHTML: '<h3>Welcome to TiddlyPWA</h3>' }));
@@ -532,24 +533,29 @@ Formatted with `deno fmt`.
 							resolve();
 						};
 					});
-					console.log(bootstrapEndpoint)
-					const pwdk = await crypto.subtle.importKey(
-						'raw',
-						utfenc.encode(passInput.value),
-						{ name: 'PBKDF2' },
-						false,
-						['deriveKey'],
+					const basebits = await crypto.subtle.deriveBits(
+						{ name: 'PBKDF2', hash: 'SHA-512', iterations: 1000000, salt: utfenc.encode('tiddly.pwa.storage') },
+						await crypto.subtle.importKey(
+							'raw',
+							utfenc.encode(passInput.value),
+							'PBKDF2',
+							false,
+							['deriveBits'],
+						),
+						256,
 					);
+					const basekey = await crypto.subtle.importKey('raw', basebits, 'HKDF', false, ['deriveKey']);
+					// fun: https://soatok.blog/2021/11/17/understanding-hkdf/ (but we don't have any randomness to shove into info)
 					this.key = await crypto.subtle.deriveKey(
-						{ name: 'PBKDF2', hash: 'SHA-512', iterations: 1000000, salt: utfenc.encode('tiddlytiddlers') },
-						pwdk,
+						{ name: 'HKDF', hash: 'SHA-256', salt: utfenc.encode('tiddly.pwa.tiddlers'), info: new Uint8Array() },
+						basekey,
 						{ name: 'AES-GCM', length: 256 },
 						false,
 						['encrypt', 'decrypt'],
 					);
 					this.mackey = await crypto.subtle.deriveKey(
-						{ name: 'PBKDF2', hash: 'SHA-512', iterations: 1000000, salt: utfenc.encode('tiddlyhmac') },
-						pwdk,
+						{ name: 'HKDF', hash: 'SHA-256', salt: utfenc.encode('tiddly.pwa.titles'), info: new Uint8Array() },
+						basekey,
 						{ name: 'HMAC', hash: 'SHA-256' },
 						false,
 						['sign'],
