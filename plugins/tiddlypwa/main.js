@@ -565,6 +565,7 @@ Formatted with `deno fmt`.
 		async _loadTiddler(title) {
 			const thash = await this.titlehash(title);
 			const obj = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').get(thash));
+			if (obj.deleted) return null; // XXX: investigate 'TiddlyPWA' default name tiddler getting synced as deleted on start
 			const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.iv }, this.key, obj.data);
 			return JSON.parse(utfdec.decode(data).trimStart());
 		}
@@ -619,8 +620,8 @@ Formatted with `deno fmt`.
 					: await adb(
 						this.db.transaction('syncservers').objectStore('syncservers').getAll(),
 					);
-				const resps = await Promise.all(servers.map(({ url, token }) =>
-					fetch(url, {
+				const resps = await Promise.all(servers.map(async ({ url, token }) => {
+					const resp = await fetch(url, {
 						method: 'POST',
 						headers: {
 							'Content-Type': 'application/json',
@@ -629,12 +630,22 @@ Formatted with `deno fmt`.
 							tiddlypwa: 1,
 							op: 'uploadapp',
 							token,
+							authcode: await b64enc(await this.titlehash(token)),
 							browserToken: this.browserToken,
-							apphtml,
-							swjs,
+							files: {
+								'app.html': {
+									body: apphtml,
+									ctype: 'text/html;charset=utf-8',
+								},
+								'sw.js': {
+									body: swjs,
+									ctype: 'application/javascript',
+								},
+							},
 						}),
-					}).then((resp) => [url, resp])
-				));
+					});
+					return [url, resp];
+				}));
 				const urls = [];
 				for (const [url, resp] of resps) {
 					if (!resp.ok) {
@@ -646,7 +657,7 @@ Formatted with `deno fmt`.
 						}
 						continue;
 					}
-					const href = new URL((await resp.json()).url, url).href;
+					const href = new URL((await resp.json()).urlprefix + 'app.html', url).href;
 					const isCurrent = isCurrentUrl(href);
 					urls.push(
 						href + (isCurrent ? ' {{$:/plugins/valpackett/tiddlypwa/cur-page-reload}}' : ''),

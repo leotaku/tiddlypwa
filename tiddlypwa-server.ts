@@ -1,8 +1,45 @@
-import { serveListener } from 'https://deno.land/std@0.159.0/http/server.ts';
-import { parse as argparse } from 'https://deno.land/std@0.159.0/flags/mod.ts';
-import * as base64 from 'https://deno.land/std@0.159.0/encoding/base64.ts';
+import * as base64 from 'https://deno.land/std@0.192.0/encoding/base64url.ts';
+import * as base64nourl from 'https://deno.land/std@0.192.0/encoding/base64.ts';
+import { parse as argparse } from 'https://deno.land/std@0.192.0/flags/mod.ts';
+import { serveListener } from 'https://deno.land/std@0.192.0/http/server.ts';
 import * as brotli from 'https://deno.land/x/brotli@0.1.7/mod.ts';
-import { DB } from 'https://deno.land/x/sqlite@v3.7.0/mod.ts';
+import * as blob from 'https://deno.land/x/kv_toolbox@0.0.2/blob.ts';
+
+type Tiddler = {
+	title: Uint8Array;
+	tiv: Uint8Array;
+	data: Uint8Array;
+	iv: Uint8Array;
+	mtime: Date;
+	deleted: boolean;
+};
+const tiddlerKeyPrefix = (token: string) => ['t', token];
+const tiddlerKey = (token: string, id: Uint8Array) => ['t', token, id];
+
+type BlobMeta = {
+	refs: Set<string>;
+	size: number;
+};
+export const blobKey = (etag: Uint8Array) => ['b', etag];
+export const blobMetaKey = (etag: Uint8Array) => ['bm', etag];
+
+type AppFile = {
+	etag: Uint8Array;
+	sig: Uint8Array;
+	size: number; // brotli compressed size
+	rawsize: number;
+	ctype: string;
+};
+
+type Wiki = {
+	token: string;
+	authcode: string;
+	files?: Map<string, AppFile>;
+};
+const ALL_WIKI_PREFIX = ['w'];
+export const wikiKey = (token: string) => ['w', token.slice(0, token.length / 2), token.slice(token.length / 2)];
+const wikiKeyHalf = (halftoken: string) => ['w', halftoken];
+const tokenFromKey = (key: string[]) => key[1] + key[2];
 
 const html = String.raw; // just for tools/editors
 const homePage = html`
@@ -43,8 +80,7 @@ const homePage = html`
 					<thead>
 						<tr>
 							<td>Token</td>
-							<td>Tiddlers Size</td>
-							<td>App Wiki Size</td>
+							<td>App Files Size</td>
 							<td></td>
 						</tr>
 					</thead>
@@ -91,14 +127,11 @@ const homePage = html`
 					const { wikis } = await resp.json();
 					const wikirows = document.getElementById('wikirows')
 					wikirows.replaceChildren();
-					for (const { token, appsize, tidsize } of wikis) {
+					for (const { token, appsize } of wikis) {
 						const tr = document.createElement('tr');
 						const tokenTd = document.createElement('td');
 						tokenTd.innerText = token;
 						tr.appendChild(tokenTd);
-						const tidsizeTd = document.createElement('td');
-						tidsizeTd.innerText = tidsize ? formatBytes(tidsize) : '-';
-						tr.appendChild(tidsizeTd);
 						const appsizeTd = document.createElement('td');
 						if (appsize > 0) {
 							const appsizeA = document.createElement('a');
@@ -159,84 +192,13 @@ const homePage = html`
 `;
 
 const args = argparse(Deno.args);
-const admintoken = (args.admintoken || Deno.env.get('ADMIN_TOKEN'))?.trim();
-const db = new DB(args.db || Deno.env.get('SQLITE_DB') || '.data/tiddly.db');
+export const admintoken = (args.admintoken || Deno.env.get('ADMIN_TOKEN'))?.trim();
+export const kv = await Deno.openKv(args.db || Deno.env.get('DB_PATH'));
 const utfenc = new TextEncoder();
-
-const dbver = db.query('PRAGMA user_version')[0][0] as number;
-if (dbver < 1) {
-	db.execute(`
-		BEGIN;
-		CREATE TABLE wikis (
-			id INTEGER PRIMARY KEY,
-			token TEXT NOT NULL,
-			authcode TEXT,
-			apphtml BLOB,
-			apphtmletag BLOB,
-			swjs BLOB,
-			swjsetag BLOB
-		) STRICT;
-		CREATE TABLE tiddlers (
-			thash BLOB PRIMARY KEY NOT NULL,
-			title BLOB,
-			tiv BLOB,
-			data BLOB,
-			iv BLOB,
-			mtime INTEGER NOT NULL,
-			deleted INTEGER NOT NULL DEFAULT 0,
-			wiki INTEGER NOT NULL,
-			FOREIGN KEY(wiki) REFERENCES wikis(id) ON DELETE CASCADE
-		) STRICT;
-		PRAGMA user_version = 1;
-		COMMIT;
-	`);
-}
-
-const wikiAuthQuery = db.prepareQuery(`
-	SELECT id, authcode, apphtmletag FROM wikis WHERE token = :token
-`);
-
-const apphtmlQuery = db.prepareQuery(`
-	SELECT apphtml, apphtmletag FROM wikis WHERE token LIKE :halftoken || '%'
-`);
-
-const swjsQuery = db.prepareQuery(`
-	SELECT swjs, swjsetag FROM wikis WHERE token LIKE :halftoken || '%'
-`);
-
-const changedQuery = db.prepareQuery<
-	[Uint8Array, Uint8Array, Uint8Array, Uint8Array, Uint8Array, number, boolean]
->(`
-	SELECT thash, title, tiv, data, iv, mtime, deleted
-	FROM tiddlers WHERE mtime > :modsince AND wiki = :wiki
-`);
-
-const upsertQuery = db.prepareQuery(`
-	INSERT INTO tiddlers (thash, title, tiv, data, iv, mtime, deleted, wiki)
-	VALUES (:thash, :title, :tiv, :data, :iv, :mtime, :deleted, :wiki)
-	ON CONFLICT (thash) DO UPDATE SET
-	title = excluded.title,
-	tiv = excluded.tiv,
-	data = excluded.data,
-	iv = excluded.iv,
-	mtime = excluded.mtime,
-	deleted = excluded.deleted
-	WHERE excluded.mtime > mtime
-`);
-
-const listQuery = db.prepareQuery<[string, number, number]>(`
-	SELECT token, length(apphtml) + length(swjs) AS appsize, (
-		SELECT sum(length(thash) + length(title) + length(tiv) + length(data) + length(iv))
-		FROM tiddlers
-		WHERE wiki = id
-	) AS tidsize
-	FROM wikis
-`);
 
 const homePat = new URLPattern({ pathname: '/' });
 const apiPat = new URLPattern({ pathname: '/tid.dly' });
-const apphtmlPat = new URLPattern({ pathname: '/:halftoken/app.html' });
-const swjsPat = new URLPattern({ pathname: '/:halftoken/sw.js' });
+const appFilePat = new URLPattern({ pathname: '/:halftoken/:filename' });
 
 const respHdrs = { 'access-control-allow-origin': '*' };
 
@@ -244,6 +206,10 @@ function parseTime(x: number) {
 	const time = new Date();
 	time.setTime(x);
 	return time;
+}
+
+function stripWeak(x: string | null) {
+	return x && (x.startsWith('W/') ? x.slice(2) : x);
 }
 
 function processEtag(etag: Uint8Array, headers: Headers): [boolean, string] {
@@ -257,15 +223,8 @@ function notifyMonitors(token: string, browserToken: string) {
 	// chan.close(); // -> Uncaught (in promise) BadResource: Bad resource ID ?!
 }
 
-function handleSync(
-	{ token, browserToken, authcode, now, clientChanges, lastSync }: {
-		token: any;
-		browserToken: any;
-		authcode: any;
-		now: any;
-		clientChanges: any;
-		lastSync: any;
-	},
+async function handleSync(
+	{ token, browserToken, authcode, now, clientChanges, lastSync }: any,
 	headers: Headers,
 ) {
 	if (
@@ -278,69 +237,75 @@ function handleSync(
 	if (Math.abs(new Date(now).getTime() - new Date().getTime()) > 60000) {
 		return Response.json({ error: 'ETIMESYNC' }, { headers: respHdrs, status: 400 });
 	}
-	const wikiRows = wikiAuthQuery.all({ token });
-	if (wikiRows.length < 1) {
+	const wiki = await kv.get<Wiki>(wikiKey(token));
+	if (!wiki.value) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	const [wiki, dbauthcode, apphtmletag] = wikiRows[0];
-	if (dbauthcode && authcode !== dbauthcode) {
+	if (wiki.value.authcode && authcode !== wiki.value.authcode) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
+	const modsince = new Date(lastSync);
+
 	const serverChanges: Array<Record<string, string | Date | boolean | null>> = [];
-	db.transaction(() => {
-		if (!dbauthcode) {
-			db.query(
-				`UPDATE wikis SET authcode = :authcode WHERE token = :token`,
-				{ token, authcode },
-			);
-		}
-		for (
-			const { thash, title, tiv, data, iv, mtime, deleted } of changedQuery.iterEntries({
-				modsince: new Date(lastSync).getTime(),
-				wiki,
-			})
-		) {
-			serverChanges.push({
-				thash: thash ? base64.encode(thash as Uint8Array) : null,
-				title: title ? base64.encode(title as Uint8Array) : null,
-				tiv: tiv ? base64.encode(tiv as Uint8Array) : null,
-				data: data ? base64.encode(data as Uint8Array) : null,
-				iv: iv ? base64.encode(iv as Uint8Array) : null,
-				mtime: parseTime(mtime as number),
-				deleted: !!(deleted as number),
-			});
-		}
-		for (const { thash, title, tiv, data, iv, mtime, deleted } of clientChanges) {
-			upsertQuery.execute({
-				thash: base64.decode(thash),
-				title: base64.decode(title),
-				tiv: base64.decode(tiv),
-				data: base64.decode(data),
-				iv: base64.decode(iv),
-				mtime: new Date(mtime || now).getTime(),
-				deleted: deleted || false,
-				wiki,
-			});
-		}
-	});
+	// console.log('---');
+	for await (const { key, value } of kv.list<Tiddler>({ prefix: tiddlerKeyPrefix(token) })) {
+		const thash = key[2];
+		const { title, tiv, data, iv, mtime, deleted } = value;
+		// console.log('ServHas', base64nourl.encode(thash as Uint8Array), mtime, modsince, mtime < modsince);
+		if (mtime <= modsince) continue;
+		serverChanges.push({
+			thash: thash ? base64nourl.encode(thash as Uint8Array) : null,
+			title: title ? base64nourl.encode(title as Uint8Array) : null,
+			tiv: tiv ? base64nourl.encode(tiv as Uint8Array) : null,
+			data: data ? base64nourl.encode(data as Uint8Array) : null,
+			iv: iv ? base64nourl.encode(iv as Uint8Array) : null,
+			mtime,
+			deleted,
+		});
+	}
+	let txn = kv.atomic();
+	// console.log('ClntChg', clientChanges);
+	for (const { thash, title, tiv, data, iv, mtime, deleted } of clientChanges) {
+		txn = txn.set(tiddlerKey(token, base64nourl.decode(thash)), {
+			title: title ? base64nourl.decode(title) : null,
+			tiv: tiv ? base64nourl.decode(tiv) : null,
+			data: data ? base64nourl.decode(data) : null,
+			iv: iv ? base64nourl.decode(iv) : null,
+			mtime: new Date(mtime || now),
+			deleted: deleted || false,
+		});
+	}
+	if (!wiki.value.authcode && authcode) {
+		wiki.value.authcode = authcode;
+		txn = txn.set(wikiKey(token), wiki.value);
+	}
+	await txn.commit();
+
 	if (clientChanges.length > 0 && typeof browserToken === 'string') notifyMonitors(token, browserToken);
 	// assuming here that the browser would use the same Accept-Encoding as when requesting the page
-	const [_, appEtag] = processEtag(apphtmletag, headers);
+	const apphtml = wiki.value.files?.get('app.html');
+	const [_, appEtag] = apphtml ? processEtag(apphtml.etag, headers) : [null, null];
 	return Response.json({ serverChanges, appEtag }, { headers: respHdrs });
 }
 
-function handleList({ atoken }: { atoken: any }) {
+async function handleList({ atoken }: any) {
 	if (typeof atoken !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
 	if (atoken !== admintoken) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	const wikis = listQuery.allEntries();
-	return Response.json({ wikis }, { headers: respHdrs, status: 201 });
+	const wikis = [];
+	for await (const { key, value } of kv.list<Wiki>({ prefix: ALL_WIKI_PREFIX })) {
+		wikis.push({
+			token: tokenFromKey(key),
+			appsize: value.files ? [...value.files.values()].reduce((sum, v) => sum + v.size, 0) : 0,
+		});
+	}
+	return Response.json({ wikis }, { headers: respHdrs, status: 200 });
 }
 
-function handleCreate({ atoken }: { atoken: any }) {
+async function handleCreate({ atoken }: any) {
 	if (typeof atoken !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
@@ -348,56 +313,106 @@ function handleCreate({ atoken }: { atoken: any }) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	const token = base64.encode(crypto.getRandomValues(new Uint8Array(32)));
-	db.query(`INSERT INTO wikis (token) VALUES (:token)`, { token });
+	await kv.set(wikiKey(token), {});
 	return Response.json({ token }, { headers: respHdrs, status: 201 });
 }
 
-function handleDelete({ atoken, token }: { atoken: any; token: any }) {
+async function garbageCollectBlobs(token: string, oldfiles: Map<string, AppFile> | null, usedetags: Set<Uint8Array>) {
+	if (!oldfiles) return;
+	for (const [filename, meta] of oldfiles) {
+		if (usedetags.has(meta.etag)) continue;
+		const key = blobMetaKey(meta.etag);
+		const prevblobmeta = await kv.get<BlobMeta>(key);
+		const blobmeta = prevblobmeta.value;
+		if (!blobmeta) continue;
+		blobmeta.refs.delete(token);
+		const txn = kv.atomic().check({ key, versionstamp: prevblobmeta.versionstamp });
+		if (blobmeta.refs.size === 0) {
+			await blob.remove(kv, blobKey(meta.etag));
+			await txn.delete(key).commit();
+		} else {
+			await txn.set(key, blobmeta).commit();
+		}
+	}
+}
+
+async function handleDelete({ atoken, token }: any) {
 	if (typeof atoken !== 'string' || typeof token !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
 	if (atoken !== admintoken) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	db.query(`DELETE FROM wikis WHERE token = :token`, { token });
+	const wiki = await kv.get<Wiki>(wikiKey(token));
+	if (!wiki.value) {
+		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
+	}
+	await kv.delete(wikiKey(token));
+	for await (const { key } of kv.list<Tiddler>({ prefix: tiddlerKeyPrefix(token) })) {
+		await kv.delete(key);
+	}
+	await garbageCollectBlobs(token, wiki.value.files, new Set());
 	return Response.json({}, { headers: respHdrs, status: 200 });
 }
 
-async function handleUploadApp(
-	{ token, browserToken, apphtml, swjs }: { token: any; browserToken: any; apphtml: any; swjs: any },
-) {
-	if (typeof token !== 'string' || typeof apphtml !== 'string' || typeof swjs !== 'string') {
+async function handleUploadApp({ token, authcode, browserToken, files }: any) {
+	if (typeof token !== 'string' || typeof files !== 'object') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	const apphtmlutf = utfenc.encode(apphtml);
-	const swjsutf = utfenc.encode(swjs);
-	db.query(
-		`UPDATE wikis SET
-		apphtml = :apphtml,
-		apphtmletag = :apphtmletag,
-		swjs = :swjs,
-		swjsetag = :swjsetag
-		WHERE token = :token`,
-		{
-			token,
-			apphtml: brotli.compress(apphtmlutf, 4096, 8),
-			apphtmletag: new Uint8Array(await crypto.subtle.digest('SHA-1', apphtmlutf)),
-			swjs: brotli.compress(swjsutf, 4096, 8),
-			swjsetag: new Uint8Array(await crypto.subtle.digest('SHA-1', swjsutf)),
-		},
-	);
+	const wiki = await kv.get<Wiki>(wikiKey(token));
+	if (!wiki.value) {
+		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
+	}
+	if (wiki.value.authcode && authcode !== wiki.value.authcode) {
+		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
+	}
+	const filemap = new Map();
+	const usedetags = new Set<Uint8Array>();
+	let txn = kv.atomic().check({ key: wikiKey(token), versionstamp: wiki.versionstamp });
+	for (const [filename, value] of Object.entries(files)) {
+		const { body, ctype, sig } = value as any;
+		const utf = utfenc.encode(body);
+		const etag = new Uint8Array(await crypto.subtle.digest('SHA-1', utf));
+		const prevblobmeta = await kv.get<BlobMeta>(blobMetaKey(etag));
+		let blobmeta;
+		if (prevblobmeta.value) {
+			blobmeta = prevblobmeta.value;
+			txn = txn.check({ key: blobMetaKey(etag), versionstamp: prevblobmeta.versionstamp });
+		} else {
+			const brot = brotli.compress(utf, 4096, 8);
+			await blob.set(kv, blobKey(etag), brot);
+			blobmeta = { refs: new Set(), size: brot.length };
+		}
+		if (!blobmeta.refs.has(token)) {
+			blobmeta.refs.add(token);
+			txn = txn.set(blobMetaKey(etag), blobmeta);
+		}
+		filemap.set(filename, {
+			etag,
+			size: blobmeta.size,
+			rawsize: utf.length,
+			sig: sig ? base64.decode(sig) : null,
+			ctype,
+		});
+		usedetags.add(etag);
+	}
+	await txn.set(wikiKey(token), {
+		...wiki.value,
+		files: filemap,
+	}).commit();
 	if (typeof browserToken === 'string') notifyMonitors(token, browserToken);
-	return Response.json({ url: token.slice(0, token.length / 2) + '/app.html' }, { headers: respHdrs, status: 200 });
+	await garbageCollectBlobs(token, wiki.value.files, usedetags);
+	return Response.json({ urlprefix: token.slice(0, token.length / 2) + '/' }, { headers: respHdrs, status: 200 });
 }
 
-function handleMonitor(query: URLSearchParams) {
+async function handleMonitor(query: URLSearchParams) {
 	const token = query.get('token');
 	const browserToken = query.get('browserToken');
 	if (!token || !browserToken) {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	const wikiRows = wikiAuthQuery.all({ token });
-	if (wikiRows.length < 1) {
+	const wiki = await kv.get<Wiki>(wikiKey(token));
+	if (!wiki.value) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	let pushChan: BroadcastChannel;
@@ -436,41 +451,55 @@ function preflightResp(methods: string) {
 	});
 }
 
-function handleDbFile(pattern: URLPattern, req: Request, query: any, ctype: string): Response | null {
-	const match = pattern.exec(req.url);
+async function handleAppFile(req: Request) {
+	const match = appFilePat.exec(req.url);
 	if (!match) return null;
 	if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
 		return new Response(null, { status: 405, headers: { 'allow': 'GET, HEAD, OPTIONS' } });
 	}
-	const res = query.all(match.pathname.groups);
-	if (res.length === 0) {
-		return Response.json({}, { status: 404 });
+	const { halftoken, filename } = match.pathname.groups;
+	if (!halftoken || !filename) return null;
+	const wiki = await (await kv.list<Wiki>({ prefix: wikiKeyHalf(halftoken) })).next();
+	if (!wiki.value || !wiki.value.value) {
+		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
 	}
 	if (req.method === 'OPTIONS') {
 		return preflightResp('GET, HEAD, OPTIONS');
 	}
-	let [body, etag] = res[0];
-	if (!body) {
-		return Response.json({}, { status: 404 });
+	const meta = wiki.value.value.files.get(filename);
+	if (!meta) {
+		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
 	}
-	const [supportsBrotli, etagstr] = processEtag(etag, req.headers);
-	// if we decomress and Deno recompresses to something else (gzip) it'll mark the ETag as a weak validator
+	const [supportsBrotli, etagstr] = processEtag(meta.etag, req.headers);
+	// if we decompress and Deno recompresses to something else (gzip) it'll mark the ETag as a weak validator
 	const headers = new Headers({
-		'content-type': ctype,
+		'content-type': meta.ctype,
 		'vary': 'Accept-Encoding',
 		'cache-control': 'no-cache',
 		'etag': etagstr,
 	});
-	if (req.headers.get('if-none-match') === etagstr) {
+	if (meta.sig) {
+		headers.set('x-tid-sig', base64.encode(meta.sig));
+	}
+	if (stripWeak(req.headers.get('if-none-match')) === etagstr) {
 		return new Response(null, { status: 304, headers });
 	}
+	let body;
 	if (supportsBrotli) {
 		headers.set('content-encoding', 'br');
+		headers.set('content-length', meta.size.toString());
+		if (req.method !== 'HEAD') {
+			body = await blob.get(kv, blobKey(meta.etag), { stream: true });
+		}
 	} else {
-		body = brotli.decompress(body);
+		headers.set('content-length', meta.rawsize.toString());
+		if (req.method !== 'HEAD') {
+			const compressed = await blob.get(kv, blobKey(meta.etag), { stream: false });
+			if (!compressed) return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
+			body = brotli.decompress(compressed);
+		}
 	}
-	headers.set('content-length', body.length);
-	return new Response(req.method === 'HEAD' ? null : body, { headers });
+	return new Response(body, { headers });
 }
 
 async function handleApiEndpoint(req: Request) {
@@ -483,10 +512,10 @@ async function handleApiEndpoint(req: Request) {
 		if (data.tiddlypwa !== 1 || !data.op) {
 			return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 		}
-		if (data.op === 'sync') return handleSync(data, req.headers);
-		if (data.op === 'list') return handleList(data);
-		if (data.op === 'create') return handleCreate(data);
-		if (data.op === 'delete') return handleDelete(data);
+		if (data.op === 'sync') return await handleSync(data, req.headers);
+		if (data.op === 'list') return await handleList(data);
+		if (data.op === 'create') return await handleCreate(data);
+		if (data.op === 'delete') return await handleDelete(data);
 		if (data.op === 'uploadapp') return await handleUploadApp(data);
 	}
 	if (req.method === 'GET') {
@@ -513,28 +542,25 @@ function handleHomePage(req: Request) {
 	return new Response(req.method === 'HEAD' ? null : homePage, { headers });
 }
 
-async function handle(req: Request) {
-	return await handleDbFile(apphtmlPat, req, apphtmlQuery, 'text/html;charset=utf-8') ||
-		await handleDbFile(swjsPat, req, swjsQuery, 'text/javascript;charset=utf-8') ||
+export async function handle(req: Request): Promise<Response> {
+	return await handleAppFile(req) ||
 		await handleApiEndpoint(req) ||
 		handleHomePage(req) ||
 		Response.json({}, { headers: respHdrs, status: 404 });
 }
 
-if (!('BroadcastChannel' in window)) {
-	throw new Error('BroadcastChannel not found, you may need to run deno with the --unstable flag');
+if (import.meta.main) {
+	const listen: any = { port: 8000 };
+	if ('port' in args) {
+		listen.port = args.port;
+	}
+	if ('host' in args) {
+		listen.hostname = args.host;
+	}
+	if ('socket' in args) {
+		listen.transport = 'unix';
+		listen.path = args.socket;
+	}
+	console.log('Listening:', listen);
+	await serveListener(Deno.listen(listen), handle);
 }
-
-const listen: any = { port: 8000 };
-if ('port' in args) {
-	listen.port = args.port;
-}
-if ('host' in args) {
-	listen.hostname = args.host;
-}
-if ('socket' in args) {
-	listen.transport = 'unix';
-	listen.path = args.socket;
-}
-console.log('Listening:', listen);
-await serveListener(Deno.listen(listen), handle);
