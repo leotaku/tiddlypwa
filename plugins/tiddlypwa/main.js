@@ -739,7 +739,7 @@ Formatted with `deno fmt`.
 							tiddlypwa: 1,
 							op: 'uploadapp',
 							token,
-							authcode: await b64enc(await this.titlehash(token)),
+							authcode: this.mackey && await b64enc(await this.titlehash(token)),
 							browserToken: this.browserToken,
 							files: {
 								'app.html': {
