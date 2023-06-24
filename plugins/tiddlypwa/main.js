@@ -522,6 +522,8 @@ Formatted with `deno fmt`.
 					showForm();
 					openModal();
 				}
+				const AW = require('$:/plugins/valpackett/tiddlypwa/argon2ian.js').ArgonWorker;
+				const argon = new AW();
 				let checked = false;
 				while (!checked) {
 					submit.disabled = false;
@@ -533,17 +535,7 @@ Formatted with `deno fmt`.
 							resolve();
 						};
 					});
-					const basebits = await crypto.subtle.deriveBits(
-						{ name: 'PBKDF2', hash: 'SHA-512', iterations: 1000000, salt: utfenc.encode('tiddly.pwa.storage') },
-						await crypto.subtle.importKey(
-							'raw',
-							utfenc.encode(passInput.value),
-							'PBKDF2',
-							false,
-							['deriveBits'],
-						),
-						256,
-					);
+					const basebits = await argon.hash(utfenc.encode(passInput.value), utfenc.encode('tiddly.pwa.storage'));
 					const basekey = await crypto.subtle.importKey('raw', basebits, 'HKDF', false, ['deriveKey']);
 					// fun: https://soatok.blog/2021/11/17/understanding-hkdf/ (but we don't have any randomness to shove into info)
 					this.key = await crypto.subtle.deriveKey(
@@ -567,6 +559,7 @@ Formatted with `deno fmt`.
 						feedback.innerHTML += '<p class=tiddlypwa-form-error>Wrong password!</p>';
 					}
 				}
+				argon.terminate();
 				closeModal();
 				if (bootstrapEndpoint) {
 					const { url, token } = bootstrapEndpoint;
