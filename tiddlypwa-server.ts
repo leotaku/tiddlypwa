@@ -1,9 +1,9 @@
 import * as base64 from 'https://deno.land/std@0.192.0/encoding/base64url.ts';
 import * as base64nourl from 'https://deno.land/std@0.192.0/encoding/base64.ts';
+import * as dotenv from 'https://deno.land/std@0.192.0/dotenv/mod.ts';
 import { parse as argparse } from 'https://deno.land/std@0.192.0/flags/mod.ts';
 import { serveListener } from 'https://deno.land/std@0.192.0/http/server.ts';
-import { timingSafeEqual } from 'https://deno.land/std@0.192.0/crypto/timing_safe_equal.ts';
-import * as argon from 'https://deno.land/x/argontwo@0.1.1/mod.ts';
+import { ArgonWorker } from 'https://deno.land/x/argon2ian@1.0.5/src/async.ts';
 import * as brotli from 'https://deno.land/x/brotli@0.1.7/mod.ts';
 import * as blob from 'https://deno.land/x/kv_toolbox@0.0.2/blob.ts';
 
@@ -194,9 +194,13 @@ const homePage = html`
 `;
 
 const args = argparse(Deno.args);
-const adminpwhash = base64.decode((args.adminpwhash || Deno.env.get('ADMIN_PASSWORD_HASH'))?.trim());
-export const kv = await Deno.openKv(args.db || Deno.env.get('DB_PATH'));
+const denv = args.dotenv ? await dotenv.load() : {};
+const envvar = (name: string) => Deno.env.get(name) ?? denv[name];
+const adminpwhash = base64.decode((args.adminpwhash ?? envvar('ADMIN_PASSWORD_HASH'))?.trim());
+const adminpwsalt = base64.decode((args.adminpwsalt ?? envvar('ADMIN_PASSWORD_SALT'))?.trim());
+export const kv = await Deno.openKv(args.db ?? envvar('DB_PATH'));
 const utfenc = new TextEncoder();
+const argon = new ArgonWorker();
 
 const homePat = new URLPattern({ pathname: '/' });
 const apiPat = new URLPattern({ pathname: '/tid.dly' });
@@ -205,7 +209,7 @@ const appFilePat = new URLPattern({ pathname: '/:halftoken/:filename' });
 const respHdrs = { 'access-control-allow-origin': '*' };
 
 function adminPasswordCorrect(atoken: string) {
-	return timingSafeEqual(argon.hash(utfenc.encode(atoken), utfenc.encode('tiddlysyncserver')), adminpwhash);
+	return argon.verify(utfenc.encode(atoken), adminpwsalt, adminpwhash);
 }
 
 function parseTime(x: number) {
@@ -298,7 +302,7 @@ async function handleList({ atoken }: any) {
 	if (typeof atoken !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	if (!adminPasswordCorrect(atoken)) {
+	if (!await adminPasswordCorrect(atoken)) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	const wikis = [];
@@ -315,7 +319,7 @@ async function handleCreate({ atoken }: any) {
 	if (typeof atoken !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	if (!adminPasswordCorrect(atoken)) {
+	if (!await adminPasswordCorrect(atoken)) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	const token = base64.encode(crypto.getRandomValues(new Uint8Array(32)));
@@ -350,7 +354,7 @@ async function handleDelete({ atoken, token }: any) {
 	if (typeof atoken !== 'string' || typeof token !== 'string') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	if (!adminPasswordCorrect(atoken)) {
+	if (!await adminPasswordCorrect(atoken)) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	const wiki = await kv.get<Wiki>(wikiKey(token));

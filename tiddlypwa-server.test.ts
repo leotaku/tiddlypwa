@@ -1,4 +1,5 @@
-// DB_PATH=:memory: ADMIN_PASSWORD_HASH=aU0v10QsB2HdeRzDvLhrWaC78Bo15GxmlKV0CUia1cU deno test --unstable --allow-env
+// deno test --unstable --allow-env --allow-read=.
+import 'https://deno.land/std@0.192.0/dotenv/load.ts';
 import { assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
 import * as app from './tiddlypwa-server.ts';
 
