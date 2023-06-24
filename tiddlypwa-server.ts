@@ -34,8 +34,8 @@ type AppFile = {
 };
 
 type Wiki = {
-	token: string;
 	authcode: string;
+	salt: string;
 	files?: Map<string, AppFile>;
 };
 const ALL_WIKI_PREFIX = ['w'];
@@ -53,7 +53,7 @@ const homePage = html`
 			<style>
 				* { box-sizing: border-box; }
 				html { background: #252525; color: #fbfbfb; -webkit-text-size-adjust: none; text-size-adjust: none; accent-color: limegreen; }
-				body { margin: 2rem auto; min-width: 300px; max-width: 70ch; line-height: 1.5; word-wrap: break-word; font-family: system-ui, sans-serif; }
+				body { margin: 2rem auto; min-width: 300px; max-width: 99ch; line-height: 1.5; word-wrap: break-word; font-family: system-ui, sans-serif; }
 				a { color: limegreen; }
 				a:hover { color: lime; }
 				h1 { font: 1.25rem monospace; text-align: center; color: limegreen; margin-bottom: 2rem; }
@@ -64,7 +64,7 @@ const homePage = html`
 				table { border-collapse: collapse; margin: 1rem 0; }
 				td { padding: 0.25rem 0.6rem; }
 				tr:nth-child(even) { background: rgba(255,255,255,.08); }
-				#wikirows td:first-of-type { font-family: monospace; }
+				#wikirows td:first-of-type, #wikirows td:nth-of-type(2) { font-family: monospace; }
 			</style>
 		</head>
 		<body>
@@ -82,6 +82,7 @@ const homePage = html`
 					<thead>
 						<tr>
 							<td>Token</td>
+							<td>Salt</td>
 							<td>App Files Size</td>
 							<td></td>
 						</tr>
@@ -129,11 +130,14 @@ const homePage = html`
 					const { wikis } = await resp.json();
 					const wikirows = document.getElementById('wikirows')
 					wikirows.replaceChildren();
-					for (const { token, appsize } of wikis) {
+					for (const { token, salt, appsize } of wikis) {
 						const tr = document.createElement('tr');
 						const tokenTd = document.createElement('td');
 						tokenTd.innerText = token;
 						tr.appendChild(tokenTd);
+						const saltTd = document.createElement('td');
+						saltTd.innerText = salt;
+						tr.appendChild(saltTd);
 						const appsizeTd = document.createElement('td');
 						if (appsize > 0) {
 							const appsizeA = document.createElement('a');
@@ -234,12 +238,12 @@ function notifyMonitors(token: string, browserToken: string) {
 }
 
 async function handleSync(
-	{ token, browserToken, authcode, now, clientChanges, lastSync }: any,
+	{ token, browserToken, authcode, salt, now, clientChanges, lastSync }: any,
 	headers: Headers,
 ) {
 	if (
 		typeof token !== 'string' || typeof authcode !== 'string' || typeof now !== 'string' ||
-		typeof lastSync !== 'string' ||
+		typeof lastSync !== 'string' || (salt && typeof salt !== 'string') ||
 		!Array.isArray(clientChanges)
 	) {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
@@ -285,10 +289,10 @@ async function handleSync(
 			deleted: deleted || false,
 		});
 	}
-	if (!wiki.value.authcode && authcode) {
-		wiki.value.authcode = authcode;
-		txn = txn.set(wikiKey(token), wiki.value);
-	}
+	let updateWiki = false;
+	if (!wiki.value.authcode && authcode) updateWiki = true, wiki.value.authcode = authcode;
+	if (!wiki.value.salt && salt) updateWiki = true, wiki.value.salt = salt;
+	if (updateWiki) txn = txn.set(wikiKey(token), wiki.value);
 	await txn.commit();
 
 	if (clientChanges.length > 0 && typeof browserToken === 'string') notifyMonitors(token, browserToken);
@@ -309,6 +313,7 @@ async function handleList({ atoken }: any) {
 	for await (const { key, value } of kv.list<Wiki>({ prefix: ALL_WIKI_PREFIX })) {
 		wikis.push({
 			token: tokenFromKey(key),
+			salt: value.salt,
 			appsize: value.files ? [...value.files.values()].reduce((sum, v) => sum + v.size, 0) : 0,
 		});
 	}
@@ -481,8 +486,11 @@ async function handleAppFile(req: Request) {
 		return preflightResp('GET, HEAD, OPTIONS');
 	}
 	if (filename === 'bootstrap.json') {
-		const it = await (await kv.list<Tiddler>({ prefix: tiddlerKeyPrefix(tokenFromKey(wiki.value.key)) })).next();
-		return Response.json({ endpoint: '/tid.dly', state: it.done ? 'fresh' : 'existing' }, { headers: respHdrs });
+		return Response.json({
+			endpoint: '/tid.dly',
+			state: wiki.value.value.salt ? 'existing' : 'fresh',
+			salt: wiki.value.value.salt,
+		}, { headers: respHdrs });
 	}
 	const meta = wiki.value.value.files?.get(filename);
 	if (!meta) {
