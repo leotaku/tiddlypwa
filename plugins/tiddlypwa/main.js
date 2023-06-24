@@ -50,7 +50,7 @@ Formatted with `deno fmt`.
 
 	function b64dec(base64) {
 		// welp touching binary strings here but seems to be a decent compact way
-		return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)).buffer;
+		return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 	}
 
 	function formatBytes(bytes) {
@@ -355,6 +355,7 @@ Formatted with `deno fmt`.
 		}
 
 		initDb(db) {
+			db.createObjectStore('metadata', { autoIncrement: true });
 			db.createObjectStore('session', { autoIncrement: true });
 			db.createObjectStore('syncservers', { autoIncrement: true });
 			db.createObjectStore('tiddlers', { keyPath: 'thash' });
@@ -389,6 +390,12 @@ Formatted with `deno fmt`.
 				this.db.transaction('tiddlers').objectStore('tiddlers').openCursor().onsuccess = (evt) =>
 					resolve(!evt.target.result)
 			);
+			if (!this.salt) {
+				const meta = await adb(this.db.transaction('metadata').objectStore('metadata').getAll());
+				if (meta.length > 0) {
+					this.salt = meta[meta.length - 1].salt;
+				}
+			}
 			if (!this.key) {
 				const ses = await adb(this.db.transaction('session').objectStore('session').getAll());
 				if (ses.length > 0) {
@@ -457,13 +464,16 @@ Formatted with `deno fmt`.
 							signal: giveUp.signal,
 							cache: 'no-store',
 						});
-						const { state, endpoint } = await resp.json();
-						if ((endpoint && typeof endpoint !== 'string') || (state && typeof state !== 'string')) {
+						const { state, endpoint, salt } = await resp.json();
+						if (
+							(endpoint && typeof endpoint !== 'string') || (state && typeof state !== 'string') ||
+							(salt && typeof salt !== 'string')
+						) {
 							alert('Something is weird with the server! Unexpected types in bootstrap.json');
 						}
 						bootstrapEndpoint = endpoint && { url: endpoint };
 						clearTimeout(timeoutGiveUpBtn);
-						let askToken = true;
+						let askToken = true, askSalt = true;
 						if (state === 'docs') {
 							this.db.close();
 							closeModal();
@@ -490,6 +500,8 @@ Formatted with `deno fmt`.
 							body.innerHTML = '<p>Welcome back to your synchronized wiki!</p>';
 							body.innerHTML +=
 								`<p>Log in using your credentials below. You are using the sync server <code>${endpoint}</code>.</p>`;
+							askSalt = false;
+							this.salt = b64dec(salt);
 						} else {
 							body.innerHTML = '<p>We are not quite sure what happened on the sync server...</p>';
 							body.innerHTML += `<p>Try to log in using your credentials below anyway?</p>`;
@@ -498,7 +510,7 @@ Formatted with `deno fmt`.
 							if (!bootstrapEndpoint) {
 								alert(`This sync server is misconfigured: no endpoint found while state is '${state}'.`);
 							}
-							const tokLbl = dm('label', { innerHTML: 'Sync token' });
+							const tokLbl = dm('label', { text: 'Sync token' });
 							tokLbl.appendChild(dm('input', {
 								attributes: { type: 'password' },
 								eventListeners: [{
@@ -507,6 +519,32 @@ Formatted with `deno fmt`.
 								}],
 							}));
 							form.appendChild(tokLbl);
+						}
+						if (askSalt) {
+							const saltDtl = dm('details', {
+								innerHTML: `
+								<summary>If you are going to sync a pre-existing wiki into this one, click here</summary>
+								<p>In order for such a sync to succeed, the wiki needs to be initialized with the same "salt" as well as the same password.</p>
+								<p>Copy the salt from the <strong>Settings</strong> → <strong>Storage and Sync</strong> page on the existing wiki, or from the sync admin interface.</p>
+							`,
+							});
+							const saltLbl = dm('label', { text: 'Salt' });
+							saltLbl.appendChild(dm('input', {
+								attributes: { type: 'text' },
+								eventListeners: [{
+									name: 'change',
+									handlerFunction: (e) => {
+										try {
+											this.salt = b64dec(e.target.value.trim());
+											feedback.innerHTML = '';
+										} catch (_e) {
+											feedback.innerHTML = '<p class=tiddlypwa-form-error>Could not decode the salt</p>';
+										}
+									},
+								}],
+							}));
+							saltDtl.appendChild(saltLbl);
+							form.appendChild(saltDtl);
 						}
 						showForm();
 						openModal();
@@ -535,7 +573,8 @@ Formatted with `deno fmt`.
 							resolve();
 						};
 					});
-					const basebits = await argon.hash(utfenc.encode(passInput.value), utfenc.encode('tiddly.pwa.storage'));
+					if (!this.salt) this.salt = crypto.getRandomValues(new Uint8Array(32));
+					const basebits = await argon.hash(utfenc.encode(passInput.value), this.salt);
 					const basekey = await crypto.subtle.importKey('raw', basebits, 'HKDF', false, ['deriveKey']);
 					// fun: https://soatok.blog/2021/11/17/understanding-hkdf/ (but we don't have any randomness to shove into info)
 					this.key = await crypto.subtle.deriveKey(
@@ -560,7 +599,9 @@ Formatted with `deno fmt`.
 					}
 				}
 				argon.terminate();
-				closeModal();
+				if (freshDb) {
+					this.db.transaction('metadata', 'readwrite').objectStore('metadata').put({ salt: this.salt });
+				}
 				if (bootstrapEndpoint) {
 					const { url, token } = bootstrapEndpoint;
 					await adb(
@@ -571,11 +612,16 @@ Formatted with `deno fmt`.
 						}),
 					);
 				}
+				closeModal();
 			} else {
 				await this.initialRead();
 			}
 			await this.reflectSyncServers();
 			await this.reflectStorageInfo();
+			this.wiki.addTiddler({
+				title: '$:/status/TiddlyPWASalt',
+				text: await b64enc(this.salt),
+			});
 		}
 
 		getStatus(cb) {
@@ -855,6 +901,7 @@ Formatted with `deno fmt`.
 					token,
 					browserToken: this.browserToken,
 					authcode: await b64enc(await this.titlehash(token)),
+					salt: await b64enc(this.salt),
 					now: new Date(), // only for a desync check
 					lastSync,
 					clientChanges,

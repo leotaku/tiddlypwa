@@ -7,5 +7,6 @@ Licensed under 0BSD, see license.tid.
 \*/
 
 .tc-modal-wrapper { backdrop-filter: blur(3px); }
-.tiddlypwa-form input, .tiddlypwa-form button { display: block; width: 100%; margin: 0.5em 0; padding: 0.25em; }
+.tiddlypwa-form input, .tiddlypwa-form button, .tiddlypwa-form details { display: block; width: 100%; margin: 0.5em 0; }
+.tiddlypwa-form input, .tiddlypwa-form button { padding: 0.25em; border-radius: 3px; border: 1px solid #999; }
 .tiddlypwa-form-error { color: #ee1111; font-weight: bolder; }

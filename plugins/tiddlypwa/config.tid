@@ -42,6 +42,9 @@ The password (or technically, the encryption key derived from it) is currently
 ''not remembered'' on this device. <$button message="tiddlypwa-remember">Remember it</$button>?
 </$reveal>
 
+The salt value for this wiki is: <code>{{$:/status/TiddlyPWASalt}}</code>
+(if you were to manually initialize a new one to sync with this one, you would need to copy this value).
+
 !! Synchronization
 
 {{$:/plugins/valpackett/tiddlypwa/sync-status}}
