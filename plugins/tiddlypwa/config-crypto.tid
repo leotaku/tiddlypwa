@@ -1,0 +1,16 @@
+title: $:/plugins/valpackett/tiddlypwa/config-crypto
+tags: $:/tags/ControlPanel/TiddlyPWA
+caption: Password Protection
+
+\define tv-wikilinks() no
+
+The password (or technically, the encryption key derived from it) is currently
+<$reveal type="match" state="$:/status/TiddlyPWARemembered" text="yes">
+''remembered'' on this device. <$button message="tiddlypwa-forget">Forget it</$button>?
+</$reveal>
+<$reveal type="nomatch" state="$:/status/TiddlyPWARemembered" text="yes">
+''not remembered'' on this device. <$button message="tiddlypwa-remember">Remember it</$button>?
+</$reveal>
+
+The salt value for this wiki is: <code>{{$:/status/TiddlyPWASalt}}</code>
+(if you were to manually initialize a new one to sync with this one, you would need to copy this value).

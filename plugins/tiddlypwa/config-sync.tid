@@ -1,0 +1,45 @@
+title: $:/plugins/valpackett/tiddlypwa/config-sync
+tags: $:/tags/ControlPanel/TiddlyPWA
+caption: Synchronization
+
+\define tv-wikilinks() no
+
+{{$:/plugins/valpackett/tiddlypwa/sync-status}}
+
+This device syncs wiki contents with the following servers:
+
+<table style="width:100%">
+<thead>
+    <tr>
+        <td>Server</td>
+        <td>Last synced change</td>
+        <td></td>
+    </tr>
+</thead>
+<$list filter="[tag[$:/temp/TiddlyPWAServer]]">
+    <tr>
+        <td>
+            {{!!url}}<br>
+            <details>
+                <summary>token</summary>
+                <code>{{!!token}}</code>
+            </details>
+        </td>
+        <td style="width:35%">{{!!lastSync}}</td>
+        <td style="width:1%">
+            <$button>
+                <$action-sendmessage $message="tiddlypwa-delete-sync-server" key={{!!key}} />
+                Delete
+            </$button>
+        </td>
+    </tr>
+</$list>
+</table>
+
+<label>URL: <$edit-text tiddler="$:/temp/TiddlyPWAServerURL" tag="input" default="https://" /></label>
+<label>Token: <$edit-text tiddler="$:/temp/TiddlyPWAServerToken" tag="input" default="" /></label>
+<$button>
+<$action-sendmessage $message="tiddlypwa-add-sync-server"
+    url={{$:/temp/TiddlyPWAServerURL}} token={{$:/temp/TiddlyPWAServerToken}} />
+Add
+</$button>
