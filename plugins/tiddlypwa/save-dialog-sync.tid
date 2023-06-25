@@ -1,0 +1,22 @@
+title: $:/plugins/valpackett/tiddlypwa/save-dialog-sync
+tags: $:/tags/TiddlyPWA/SaveDialog
+caption: Sync Status
+
+\define tv-wikilinks() no
+
+<table style="width:100%">
+<thead>
+    <tr>
+        <td>Server</td>
+        <td>Last synced change</td>
+    </tr>
+</thead>
+<$list filter="[tag[$:/temp/TiddlyPWAServer]]">
+    <tr>
+        <td>{{!!url}}</td>
+        <td style="width:35%">{{!!lastSync}}</td>
+    </tr>
+</$list>
+</table>
+
+{{$:/plugins/valpackett/tiddlypwa/sync-status}}

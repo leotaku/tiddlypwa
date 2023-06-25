@@ -1,0 +1,43 @@
+title: $:/plugins/valpackett/tiddlypwa/save-dialog-app
+tags: $:/tags/TiddlyPWA/SaveDialog
+caption: Advanced App Management
+
+\define tv-wikilinks() no
+
+<$reveal type="match" state="$:/isEncrypted" text="yes">
+TiddlyWiki single-file password must not be used when doing this, please disable it: {{$:/core/ui/Buttons/encryption}}
+</$reveal>
+<$reveal type="nomatch" state="$:/isEncrypted" text="yes">
+
+To update the wiki file that is used as the TiddlyPWA application (''this is the kind of save you want to install plugins/themes''), you can
+<$button>
+<$action-sendmessage $message="tm-download-file" publishFilter={{$:/plugins/valpackett/tiddlypwa/app-filter}} />
+save this wiki without content
+</$button>
+<$reveal type="nomatch" state="$:/status/TiddlyPWAUploading" text="yes">
+or directly
+<$button>
+<$action-sendmessage $message="tiddlypwa-upload-app-wiki" publishFilter={{$:/plugins/valpackett/tiddlypwa/app-filter}} />
+upload it to sync servers
+</$button>
+</$reveal>!
+
+<details>
+<summary>Or even upload to a sync server you are not currently syncing with…</summary>
+{{$:/plugins/valpackett/tiddlypwa/upload-app-form}}
+</details>
+
+{{$:/status/TiddlyPWAUploadResult}}
+
+Note that some basic configuration like the title, subtitle, favicon, theme and palette will be saved unencrypted.
+
+<details>
+<summary>Specifically, these tiddlers will be saved…</summary>
+<ul>
+<$list filter={{$:/plugins/valpackett/tiddlypwa/app-filter}}>
+<li><<currentTiddler>></li>
+</$list>
+</ul>
+</details>
+
+</$reveal>

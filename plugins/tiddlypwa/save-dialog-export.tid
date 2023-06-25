@@ -1,0 +1,14 @@
+title: $:/plugins/valpackett/tiddlypwa/save-dialog-export
+tags: $:/tags/TiddlyPWA/SaveDialog
+caption: Export Single-File
+
+\define tv-wikilinks() no
+
+To make a single-file export/backup of the wiki, you can {{$:/core/ui/Buttons/encryption}} if you want and 
+<$button>
+<$action-sendmessage $message="tm-download-file" publishFilter="-[[$:/HistoryList]] -[[$:/StoryList]] -[[$:/isEncrypted]] -[[$:/UploadName]] -[prefix[$:/state/]] -[prefix[$:/status/]] -[prefix[$:/temp/]] -[prefix[$:/plugins/valpackett/tiddlypwa]]"/>
+save this wiki without TiddlyPWA
+</$button>.
+
+Note that the password configured via the button above will ''only'' apply to wiki files exported via this save button.
+It is completely independent of the TiddlyPWA storage password.

@@ -70,6 +70,14 @@ Formatted with `deno fmt`.
 		return url === `${location.origin}${location.pathname}${location.search}`;
 	}
 
+	function saveToApp(title) {
+		return title.startsWith('$:/themes/') ||
+			title.startsWith('$:/plugins/') ||
+			title.startsWith('$:/languages/');
+	}
+
+	$tw.wiki.doesPluginInfoRequireReload = (x) => x && x.tiddlers && Object.keys(x.tiddlers).find(saveToApp);
+
 	class PWAStorage {
 		constructor(options) {
 			this.wiki = options.wiki;
@@ -699,12 +707,7 @@ Formatted with `deno fmt`.
 				// For some reason this is not in the default $:/config/SyncFilter but no one would want this actually stored.
 				return cb(null, '', 1);
 			}
-			if (
-				tiddler.fields.title.startsWith('$:/themes/') ||
-				tiddler.fields.title.startsWith('$:/plugins/') ||
-				tiddler.fields.title.startsWith('$:/languages/')
-			) {
-				// Those should go into the saved wiki file.
+			if (saveToApp(tiddler.fields.title)) {
 				// Attempting to only direct the `doesPluginRequireReload` ones into the file does not seem worth it.
 				// By ignoring the callback we make TW think there's something unsaved now, which there is!
 				return;
