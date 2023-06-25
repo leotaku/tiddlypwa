@@ -49,7 +49,6 @@ Formatted with `deno fmt`.
 	}
 
 	function b64dec(base64) {
-		// welp touching binary strings here but seems to be a decent compact way
 		return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 	}
 
@@ -247,7 +246,7 @@ Formatted with `deno fmt`.
 			this.startedMonitor = true;
 			if (this.monitorTimeout < 60000) this.monitorTimeout *= 2;
 			clearTimeout(this.monitorTimer);
-			this.monitorTimer = setTimeout(async () => {
+			this.monitorTimer = setTimeout(() => {
 				if (!navigator.locks) {
 					this._startRealtimeMonitor();
 				}
@@ -349,7 +348,9 @@ Formatted with `deno fmt`.
 			setTimeout(() => {
 				try {
 					$tw.__update_tiddlypwa_manifest__();
-				} catch (_e) {}
+				} catch (e) {
+					console.error(e);
+				}
 			}, 300);
 			return true;
 		}
@@ -455,7 +456,7 @@ Formatted with `deno fmt`.
 							},
 							eventListeners: [{
 								name: 'click',
-								handlerFunction: (e) => giveUp.abort(),
+								handlerFunction: () => giveUp.abort(),
 							}],
 						})), 6900);
 					timeoutModal = setTimeout(openModal, 1000);
@@ -549,6 +550,7 @@ Formatted with `deno fmt`.
 						showForm();
 						openModal();
 					} catch (e) {
+						console.error(e);
 						clearTimeout(timeoutGiveUpBtn);
 						body.innerHTML = '<p>Oops, looks like there is no information about the current server to be found!</p>';
 						body.innerHTML += '<p>Oh well, synchronization can be set up later in the settings.</p>';
