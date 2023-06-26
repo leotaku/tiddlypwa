@@ -584,7 +584,9 @@ Formatted with `deno fmt`.
 						};
 					});
 					if (!this.salt) this.salt = crypto.getRandomValues(new Uint8Array(32));
-					const basebits = await argon.hash(utfenc.encode(passInput.value), this.salt);
+					console.time('hash');
+					const basebits = await argon.hash(utfenc.encode(passInput.value), this.salt, { m: 1 << 17 });
+					console.timeLog('hash');
 					const basekey = await crypto.subtle.importKey('raw', basebits, 'HKDF', false, ['deriveKey']);
 					// fun: https://soatok.blog/2021/11/17/understanding-hkdf/ (but we don't have any randomness to shove into info)
 					this.key = await crypto.subtle.deriveKey(
