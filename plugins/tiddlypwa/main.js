@@ -52,6 +52,76 @@ Formatted with `deno fmt`.
 		return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 	}
 
+	async function encodeTiddler(tiddler, isBin) {
+		const padTo = 256;
+		let flags = 0, gzchunks, gzlen = 0, binstr;
+		const jsonstr = JSON.stringify(
+			Object.keys(tiddler.fields).reduce((o, k) => {
+				if (k === 'text' && isBin) return o;
+				o[k] = tiddler.getFieldString(k);
+				return o;
+			}, Object.create(null)),
+		);
+		if (isBin) {
+			flags |= 1;
+			binstr = atob(tiddler.fields.text);
+		}
+		if (jsonstr.length > 240) {
+			flags |= 1 << 1;
+			gzchunks = [];
+			const rdr = new Blob([jsonstr]).stream().pipeThrough(new CompressionStream('gzip'));
+			for await (const chunk of rdr) {
+				gzchunks.push(chunk);
+				gzlen += chunk.length;
+			}
+		}
+
+		const resbuflen = 5 + (gzchunks ? gzlen : 3 * jsonstr.length) + (binstr ? 4 + binstr.length : 0);
+		const result = new Uint8Array(resbuflen + (padTo - (resbuflen % padTo)));
+		let bodylen;
+		if (gzchunks) {
+			let ptr = 5;
+			for (const chunk of gzchunks) {
+				result.set(chunk, ptr);
+				ptr += chunk.length;
+			}
+			bodylen = gzlen;
+		} else {
+			bodylen = utfenc.encodeInto(jsonstr, result.subarray(5, 5 + 3 * jsonstr.length)).written;
+		}
+		const dw = new DataView(result.buffer);
+		dw.setUint8(0, flags);
+		dw.setUint32(1, bodylen);
+		if (binstr) {
+			dw.setUint32(5 + bodylen, binstr.length);
+			for (let i = 0; i < binstr.length; i++) result[5 + bodylen + 4 + i] = binstr.charCodeAt(i);
+		}
+		const reslen = 5 + bodylen + (binstr ? 4 + binstr.length : 0);
+		return result.subarray(0, reslen + (padTo - (reslen % padTo)));
+	}
+
+	async function decodeTiddler(bin) {
+		const dw = new DataView(bin);
+		const flags = dw.getUint8(0);
+		const isBin = flags & 1;
+		const isGzipped = flags & (1 << 1);
+		const bodylen = dw.getUint32(1);
+		const body = new Uint8Array(bin, 5, bodylen);
+		let tiddler;
+		if (isGzipped) {
+			let json = '';
+			const rdr = new Blob([body]).stream().pipeThrough(new DecompressionStream('gzip'));
+			for await (const chunk of rdr) json += utfdec.decode(chunk);
+			tiddler = JSON.parse(json);
+		} else {
+			tiddler = JSON.parse(utfdec.decode(body));
+		}
+		if (isBin) {
+			tiddler.text = await b64enc(new Uint8Array(bin, 5 + bodylen + 4, dw.getUint32(5 + bodylen)));
+		}
+		return tiddler;
+	}
+
 	function formatBytes(bytes) {
 		const sizes = ['bytes', '~KiB', '~MiB', '~GiB', '~TiB'];
 		const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
@@ -674,12 +744,10 @@ Formatted with `deno fmt`.
 
 		async _saveTiddler(tiddler) {
 			const thash = await this.titlehash(tiddler.fields.title);
-			const jsondata = this.wiki.getTiddlerAsJson(tiddler.fields.title);
-			// padding because sync servers don't need to know the precise lengths of everything
-			const rawdata = utfenc.encode('\n'.repeat(256 - (jsondata.length % 256)) + jsondata);
+			const encoded = await encodeTiddler(tiddler, this.wiki.isBinaryTiddler(tiddler.fields.title));
 			// "if you use nonces longer than 12 bytes, they get hashed into 12 bytes anyway" - soatok.blog
 			const iv = crypto.getRandomValues(new Uint8Array(12));
-			const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this.key, rawdata);
+			const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this.key, encoded);
 			const tiv = crypto.getRandomValues(new Uint8Array(12));
 			const title = await crypto.subtle.encrypt(
 				{ name: 'AES-GCM', iv: tiv },
@@ -728,7 +796,7 @@ Formatted with `deno fmt`.
 			const obj = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').get(thash));
 			if (obj.deleted) return null;
 			const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.iv }, this.key, obj.data);
-			return JSON.parse(utfdec.decode(data).trimStart());
+			return await decodeTiddler(data);
 		}
 
 		loadTiddler(title, cb) {
