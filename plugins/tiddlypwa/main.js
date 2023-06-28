@@ -148,7 +148,7 @@ Formatted with `deno fmt`.
 			title.startsWith('$:/languages/');
 	}
 
-	$tw.wiki.doesPluginInfoRequireReload = (x) => x && x.tiddlers && Object.keys(x.tiddlers).find(saveToApp);
+	$tw.wiki.doesPluginInfoRequireReload = (x) => x?.tiddlers && Object.keys(x.tiddlers).find(saveToApp);
 
 	class PWAStorage {
 		constructor(options) {
@@ -225,8 +225,8 @@ Formatted with `deno fmt`.
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-add-sync-server', (evt) => {
-				const url = evt && evt.paramObject && evt.paramObject.url;
-				const token = evt && evt.paramObject && evt.paramObject.token;
+				const url = evt?.paramObject?.url;
+				const token = evt?.paramObject?.token;
 				if (!url || !token) {
 					alert('A sync server must have a URL and a token!');
 					return;
@@ -253,7 +253,7 @@ Formatted with `deno fmt`.
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-delete-sync-server', (evt) => {
-				const key = evt && evt.paramObject && evt.paramObject.key;
+				const key = evt?.paramObject?.key;
 				adb(
 					this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').delete(parseInt(key)),
 				).then((_x) => {
@@ -385,7 +385,7 @@ Formatted with `deno fmt`.
 		async reflectStorageInfo() {
 			this.wiki.addTiddler({
 				title: '$:/status/TiddlyPWAStoragePersisted',
-				text: (navigator.storage && navigator.storage.persist)
+				text: (navigator.storage?.persist)
 					? (await navigator.storage.persisted() ? 'yes' : 'no')
 					: 'unavail',
 			});
@@ -393,7 +393,7 @@ Formatted with `deno fmt`.
 				`${formatBytes(usage)} of ${formatBytes(quota)} (${(usage / quota * 100).toFixed(2)}%)`;
 			this.wiki.addTiddler({
 				title: '$:/status/TiddlyPWAStorageQuota',
-				text: (navigator.storage && navigator.storage.estimate)
+				text: (navigator.storage?.estimate)
 					? formatEstimate(await navigator.storage.estimate())
 					: 'unavail',
 			});
