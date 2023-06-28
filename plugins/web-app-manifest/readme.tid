@@ -1,11 +1,11 @@
 title: $:/plugins/valpackett/web-app-manifest/readme
 
-!! ~TiddlyPWA Manifest
+!! Web App Manifest
 
 This plugin dynamically generates and applies a [[Web App Manifest|https://developer.mozilla.org/en-US/docs/Web/Manifest]]
 for the wiki, which is necessary for "add to home screen" style web app installation in browsers.
 
-When saving the wiki (as a new TiddlyPWA app HTML file), the manifest is also inlined into the `<head>`.
+When saving the wiki, the manifest is also inlined into the `<head>`.
 Having the manifest be statically present in the file increases compatibility with [[browser bugs|https://github.com/mozilla-mobile/fenix/issues/16672]].
 
 You can also <$button message="tiddlypwa-get-manifest">download the current manifest as a file</$button>.
