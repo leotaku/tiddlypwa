@@ -13,10 +13,6 @@ Formatted with `deno fmt`.
 
 	if (!$tw.browser) return;
 
-	if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-		alert('Warning! TiddlyPWA must be served over HTTPS.');
-	}
-
 	const knownErrors = {
 		EAUTH: 'Wrong password and/or sync token',
 		EPROTO: 'Protocol incompatibility',
@@ -290,6 +286,21 @@ Formatted with `deno fmt`.
 			});
 		}
 
+		missingFeaturesWarning() {
+			const crit = [
+				!isSecureContext &&
+				'The app is not loaded from a secure context (HTTPS)! Cannot continue due to unavailable features. Please use a secure server.',
+				typeof WebAssembly !== 'object' && 'WebAssembly is unavailable, we cannot unlock the wiki without it.',
+				typeof indexedDB !== 'object' &&
+				'IndexedDB is unavailable, we cannot even store anything here.',
+				typeof DecompressionStream !== 'function' &&
+				'Compression Streams are unavailable, we cannot unlock the wiki without that. Please upgrade your browser.',
+				!this.db && 'Could not create a database. Are you in private browsing mode? TiddlyPWA does not work there.',
+			].filter((x) => !!x);
+			// Don't really have tests for non-critical features right now as Compression Streams are already a huge support bound
+			return [crit.length > 0, crit.map((x) => `<p class=tiddlypwa-form-error>${x}</p>`).join('\n')];
+		}
+
 		async initServiceWorker() {
 			try {
 				const reg = await navigator.serviceWorker.register('sw.js');
@@ -347,9 +358,6 @@ Formatted with `deno fmt`.
 			if (this.monitorTimeout < 60000) this.monitorTimeout *= 2;
 			clearTimeout(this.monitorTimer);
 			this.monitorTimer = setTimeout(() => {
-				if (!navigator.locks) {
-					this._startRealtimeMonitor();
-				}
 				navigator.locks.request(
 					`tiddlypwa-realtime:${location.pathname}`,
 					(_lck) => this._startRealtimeMonitor(),
@@ -385,17 +393,13 @@ Formatted with `deno fmt`.
 		async reflectStorageInfo() {
 			this.wiki.addTiddler({
 				title: '$:/status/TiddlyPWAStoragePersisted',
-				text: (navigator.storage?.persist)
-					? (await navigator.storage.persisted() ? 'yes' : 'no')
-					: 'unavail',
+				text: (navigator.storage?.persist) ? (await navigator.storage.persisted() ? 'yes' : 'no') : 'unavail',
 			});
 			const formatEstimate = ({ usage, quota }) =>
 				`${formatBytes(usage)} of ${formatBytes(quota)} (${(usage / quota * 100).toFixed(2)}%)`;
 			this.wiki.addTiddler({
 				title: '$:/status/TiddlyPWAStorageQuota',
-				text: (navigator.storage?.estimate)
-					? formatEstimate(await navigator.storage.estimate())
-					: 'unavail',
+				text: (navigator.storage?.estimate) ? formatEstimate(await navigator.storage.estimate()) : 'unavail',
 			});
 		}
 
@@ -485,19 +489,24 @@ Formatted with `deno fmt`.
 				req.onupgradeneeded = (evt) => {
 					this.initDb(evt.target.result);
 				};
-				this.db = await adb(req);
+				try {
+					this.db = await adb(req);
+				} catch (e) {
+					console.error(e);
+				}
 			}
-			const freshDb = await new Promise((resolve) =>
-				this.db.transaction('tiddlers').objectStore('tiddlers').openCursor().onsuccess = (evt) =>
-					resolve(!evt.target.result)
-			);
-			if (!this.salt) {
+			const freshDb = !this.db ||
+				await new Promise((resolve) =>
+					this.db.transaction('tiddlers').objectStore('tiddlers').openCursor().onsuccess = (evt) =>
+						resolve(!evt.target.result)
+				);
+			if (this.db && !this.salt) {
 				const meta = await adb(this.db.transaction('metadata').objectStore('metadata').getAll());
 				if (meta.length > 0) {
 					this.salt = meta[meta.length - 1].salt;
 				}
 			}
-			if (!this.key) {
+			if (this.db && !this.key) {
 				const ses = await adb(this.db.transaction('session').objectStore('session').getAll());
 				if (ses.length > 0) {
 					this.key = ses[ses.length - 1].key;
@@ -509,6 +518,7 @@ Formatted with `deno fmt`.
 				let bootstrapEndpoint;
 				$tw.utils.addClass($tw.pageContainer, 'tc-modal-displayed');
 				$tw.utils.addClass(document.body, 'tc-modal-prevent-scroll');
+				const [weAreScrewed, missingWarning] = this.missingFeaturesWarning();
 				const dm = $tw.utils.domMaker;
 				// below alerts, above hide-sidebar-btn
 				const wrapper = dm('div', { class: 'tc-modal-wrapper', style: { 'z-index': 1500 } });
@@ -521,14 +531,16 @@ Formatted with `deno fmt`.
 				const passInput = dm('input', { attributes: { type: 'password' } });
 				passLbl.appendChild(passInput);
 				const submit = dm('button', { attributes: { type: 'submit' }, text: 'Log in' });
-				const feedback = dm('div', {});
+				const feedback = dm('div', { innerHTML: missingWarning });
 				modal.appendChild(body);
 				document.body.appendChild(wrapper);
 				let opened = false;
 				let timeoutModal;
 				const showForm = () => {
-					form.appendChild(passLbl);
-					form.appendChild(submit);
+					if (!weAreScrewed) {
+						form.appendChild(passLbl);
+						form.appendChild(submit);
+					}
 					form.appendChild(feedback);
 					body.appendChild(form);
 				};
@@ -576,14 +588,22 @@ Formatted with `deno fmt`.
 						clearTimeout(timeoutGiveUpBtn);
 						let askToken = true, askSalt = true;
 						if (state === 'docs') {
-							this.db.close();
 							closeModal();
-							$tw.syncer.isDirty = () => false; // skip the onbeforeunload
-							await adb(indexedDB.deleteDatabase(`tiddlypwa:${location.pathname}`));
+							if (this.db) {
+								this.db.close();
+								await adb(indexedDB.deleteDatabase(`tiddlypwa:${location.pathname}`));
+							}
 							this.db = undefined;
+							$tw.syncer.isDirty = () => false; // skip the onbeforeunload
 							this.wiki.addTiddler({ title: '$:/status/TiddlyPWADocsMode', text: 'yes' });
 							return;
-						} else if (state === 'localonly') {
+						}
+						if (weAreScrewed) {
+							body.innerHTML = '<p>Oops…</p>';
+							showForm();
+							return;
+						}
+						if (state === 'localonly') {
 							body.innerHTML = '<p>Welcome to your new local-only wiki!</p>';
 							body.innerHTML +=
 								'<p>This wiki is not hosted on a sync server and will not automatically start to synchronize your data. However, you can always add sync servers later in the settings!</p>';
@@ -1115,10 +1135,6 @@ Formatted with `deno fmt`.
 			}
 			this.isSyncing = true;
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncing', text: 'yes' });
-			if (!navigator.locks) {
-				// welp, using multiple tabs without Web Locks is dangerous, but we can only YOLO it in this case
-				return this._syncManyUnlocked(all);
-			}
 			return navigator.locks.request(`tiddlypwa:${location.pathname}`, (_lck) => this._syncManyUnlocked(all));
 		}
 
