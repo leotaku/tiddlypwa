@@ -502,7 +502,7 @@ async function handleAppFile(req: Request) {
 	}
 	const { halftoken, filename } = match.pathname.groups;
 	if (!halftoken || !filename) return null;
-	const wiki = await (await kv.list<Wiki>({ prefix: wikiKeyHalf(halftoken) })).next();
+	const wiki = await kv.list<Wiki>({ prefix: wikiKeyHalf(halftoken) }).next();
 	if (!wiki.value || !wiki.value.value) {
 		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
 	}
@@ -536,7 +536,7 @@ async function handleAppFile(req: Request) {
 		headers.set('content-encoding', 'br');
 		headers.set('content-length', meta.size.toString());
 		if (req.method !== 'HEAD') {
-			body = await blob.get(kv, blobKey(meta.etag), { stream: true });
+			body = blob.get(kv, blobKey(meta.etag), { stream: true });
 		}
 	} else {
 		headers.set('content-length', meta.rawsize.toString());
