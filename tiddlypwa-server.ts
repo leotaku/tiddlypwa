@@ -29,7 +29,6 @@ export const blobMetaKey = (etag: Uint8Array) => ['bm', etag];
 
 type AppFile = {
 	etag: Uint8Array;
-	sig: Uint8Array;
 	size: number; // brotli compressed size
 	rawsize: number;
 	ctype: string;
@@ -415,7 +414,7 @@ async function handleUploadApp({ token, authcode, browserToken, files }: any) {
 	const usedetags = new Set<Uint8Array>();
 	let txn = kv.atomic().check({ key: wikiKey(token), versionstamp: wiki.versionstamp });
 	for (const [filename, value] of Object.entries(files)) {
-		const { body, ctype, sig } = value as any;
+		const { body, ctype } = value as any;
 		const utf = utfenc.encode(body);
 		const etag = new Uint8Array(await crypto.subtle.digest('SHA-1', utf));
 		const prevblobmeta = await kv.get<BlobMeta>(blobMetaKey(etag));
@@ -436,7 +435,6 @@ async function handleUploadApp({ token, authcode, browserToken, files }: any) {
 			etag,
 			size: blobmeta.size,
 			rawsize: utf.length,
-			sig: sig ? base64.decode(sig) : null,
 			ctype,
 		});
 		usedetags.add(etag);
@@ -530,9 +528,6 @@ async function handleAppFile(req: Request) {
 		'cache-control': 'no-cache',
 		'etag': etagstr,
 	});
-	if (meta.sig) {
-		headers.set('x-tid-sig', base64.encode(meta.sig));
-	}
 	if (stripWeak(req.headers.get('if-none-match')) === etagstr) {
 		return new Response(null, { status: 304, headers });
 	}
