@@ -6,5 +6,10 @@
 			"singleQuote": true,
 			"proseWrap": "preserve"
 		}
+	},
+	"imports": {
+		"https://deno.land/std@0.159.0/": "https://deno.land/std@0.192.0/",
+		"https://deno.land/std@0.170.0/": "https://deno.land/std@0.192.0/",
+		"https://deno.land/std@0.186.0/": "https://deno.land/std@0.192.0/"
 	}
 }

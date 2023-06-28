@@ -5,7 +5,7 @@ import * as base64nourl from 'https://deno.land/std@0.192.0/encoding/base64.ts';
 import * as dotenv from 'https://deno.land/std@0.192.0/dotenv/mod.ts';
 import { parse as argparse } from 'https://deno.land/std@0.192.0/flags/mod.ts';
 import { serveListener } from 'https://deno.land/std@0.192.0/http/server.ts';
-import * as argon from 'https://deno.land/x/argon2ian@1.0.5/src/argon2.ts';
+import * as argon from 'https://deno.land/x/argon2ian@2.0.0/src/argon2.ts';
 import * as brotli from 'https://deno.land/x/brotli@0.1.7/mod.ts';
 import * as blob from 'https://deno.land/x/kv_toolbox@0.0.2/blob.ts';
 
