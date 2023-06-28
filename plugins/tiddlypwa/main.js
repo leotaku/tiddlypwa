@@ -228,7 +228,7 @@ Formatted with `deno fmt`.
 					return;
 				}
 				try {
-					new URL(url);
+					new URL(url, document.location);
 				} catch (_e) {
 					alert('The URL must be valid!');
 					return;
@@ -323,11 +323,11 @@ Formatted with `deno fmt`.
 			);
 			if (servers.length === 0) return;
 			const server = servers[~~(Math.random() * servers.length)];
+			const url = new URL(server.url, document.location);
 			this.wiki.addTiddler({
 				title: '$:/status/TiddlyPWARealtime',
-				text: `connecting to ${server.url}`,
+				text: `connecting to ${url}`,
 			});
-			const url = new URL(server.url);
 			url.searchParams.set('op', 'monitor');
 			url.searchParams.set('token', server.token);
 			url.searchParams.set('browserToken', this.browserToken);
@@ -336,7 +336,7 @@ Formatted with `deno fmt`.
 				this.monitorTimeout = 2000;
 				this.wiki.addTiddler({
 					title: '$:/status/TiddlyPWARealtime',
-					text: `connected to ${server.url}`,
+					text: `connected to ${url}`,
 				});
 			};
 			this.monitorStream.addEventListener('sync', (_evt) => this.backgroundSync());
@@ -345,7 +345,7 @@ Formatted with `deno fmt`.
 			});
 			this.wiki.addTiddler({
 				title: '$:/status/TiddlyPWARealtime',
-				text: `disconnected from ${server.url}`,
+				text: `disconnected from ${url}`,
 			});
 			this.monitorStream.close();
 			this.startedMonitor = false;
@@ -358,6 +358,10 @@ Formatted with `deno fmt`.
 			if (this.monitorTimeout < 60000) this.monitorTimeout *= 2;
 			clearTimeout(this.monitorTimer);
 			this.monitorTimer = setTimeout(() => {
+				this.wiki.addTiddler({
+					title: '$:/status/TiddlyPWARealtime',
+					text: `possibly another tab is currently responsible for the connection`,
+				});
 				navigator.locks.request(
 					`tiddlypwa-realtime:${location.pathname}`,
 					(_lck) => this._startRealtimeMonitor(),
