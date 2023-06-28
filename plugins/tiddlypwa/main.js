@@ -156,14 +156,18 @@ Formatted with `deno fmt`.
 			this.changesChannel = new BroadcastChannel(`tiddlypwa-changes:${location.pathname}`);
 			this.changesChannel.onmessage = (evt) => {
 				if (evt.data.title === '$:/StoryList') return; // don't mess with viewing different things in multiple tabs
-				this.logger.log('Change from another tab', evt.data);
+				this.logger.log('Change from another tab');
 				if (evt.data.del) {
 					this.deletedQueue.add(evt.data.title);
 				} else {
 					this.modifiedQueue.add(evt.data.title);
 				}
 				$tw.syncer.syncFromServer(); // "server" being our local DB
-				this.reflectStorageInfo();
+				clearTimeout(this.tabChangesReflTimer);
+				this.tabChangesReflTimer = setTimeout(() => {
+					this.reflectSyncServers();
+					this.reflectStorageInfo();
+				}, 2000);
 			};
 			this.serversChannel = new BroadcastChannel(`tiddlypwa-servers:${location.pathname}`);
 			this.serversChannel.onmessage = (_evt) => {
@@ -778,7 +782,7 @@ Formatted with `deno fmt`.
 				modifications: [...this.modifiedQueue],
 				deletions: [...this.deletedQueue],
 			};
-			this.logger.log('Reflecting updates to wiki runtime', chg);
+			this.logger.log('Reflecting updates to wiki runtime');
 			this.modifiedQueue.clear();
 			this.deletedQueue.clear();
 			cb(null, chg);
