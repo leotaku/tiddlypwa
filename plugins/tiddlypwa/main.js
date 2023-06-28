@@ -195,7 +195,7 @@ Formatted with `deno fmt`.
 			);
 
 			document.addEventListener('visibilitychange', (_evt) => {
-				if (document.visibilityState === 'visible' && this.db) this.backgroundSync();
+				if (document.visibilityState === 'visible') this.backgroundSync();
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-remember', (_evt) => {
@@ -1160,7 +1160,7 @@ Formatted with `deno fmt`.
 		}
 
 		backgroundSync() {
-			if (!navigator.onLine) return;
+			if (!navigator.onLine || !this.db) return;
 			// debounced to handle multiple saves in quick succession
 			clearTimeout(this.syncTimer);
 			this.syncTimer = setTimeout(() => this.sync(false), 1000);
