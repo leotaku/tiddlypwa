@@ -333,7 +333,13 @@ Formatted with `deno fmt`.
 			const servers = await adb(
 				this.db.transaction('syncservers').objectStore('syncservers').getAll(),
 			);
-			if (servers.length === 0) return;
+			if (servers.length === 0) {
+				this.wiki.addTiddler({
+					title: '$:/status/TiddlyPWARealtime',
+					text: `no sync servers`,
+				});
+				return;
+			}
 			const server = servers[~~(Math.random() * servers.length)];
 			const url = new URL(server.url, document.location);
 			this.wiki.addTiddler({
