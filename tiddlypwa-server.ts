@@ -151,6 +151,13 @@ const homePage = html`
 						}
 						tr.appendChild(appsizeTd);
 						const btnsTd = document.createElement('td');
+						const btnReauth = document.createElement('button');
+						btnReauth.innerText = 'Clear Auth';
+						btnReauth.onclick = (e) => {
+							if (!confirm('Do you really want to clear authentication checks for the wiki with token ' + token + '?')) return;
+							serverReq({ op: 'reauth', token }).then(() => document.getElementById('refresh').click());
+						};
+						btnsTd.appendChild(btnReauth);
 						const btnDel = document.createElement('button');
 						btnDel.innerText = 'Delete';
 						btnDel.onclick = (e) => {
@@ -375,6 +382,24 @@ async function handleDelete({ atoken, token }: any) {
 	return Response.json({}, { headers: respHdrs, status: 200 });
 }
 
+async function handleReauth({ atoken, token }: any) {
+	if (typeof atoken !== 'string' || typeof token !== 'string') {
+		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
+	}
+	if (!adminPasswordCorrect(atoken)) {
+		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
+	}
+	const wiki = await kv.get<Wiki>(wikiKey(token));
+	if (!wiki.value) {
+		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
+	}
+	await kv.set(wikiKey(token), {
+		...wiki.value,
+		authcode: undefined,
+	});
+	return Response.json({}, { headers: respHdrs, status: 200 });
+}
+
 async function handleUploadApp({ token, authcode, browserToken, files }: any) {
 	if (typeof token !== 'string' || typeof files !== 'object') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
@@ -543,6 +568,7 @@ async function handleApiEndpoint(req: Request) {
 		if (data.op === 'list') return await handleList(data);
 		if (data.op === 'create') return await handleCreate(data);
 		if (data.op === 'delete') return await handleDelete(data);
+		if (data.op === 'reauth') return await handleReauth(data);
 		if (data.op === 'uploadapp') return await handleUploadApp(data);
 	}
 	if (req.method === 'GET') {
