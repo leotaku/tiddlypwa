@@ -6,6 +6,7 @@ module-type: library
 Licensed under 0BSD, see license.tid.
 Formatted with `deno fmt`.
 \*/
+/// <reference types="npm:tw5-typed" />
 (function () {
 	'use strict';
 

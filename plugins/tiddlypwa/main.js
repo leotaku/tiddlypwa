@@ -6,6 +6,8 @@ module-type: syncadaptor
 Licensed under 0BSD, see license.tid.
 Formatted with `deno fmt`.
 \*/
+/// <reference types="npm:tw5-typed" />
+// deno-lint-ignore-file no-window-prefix
 (function () {
 	'use strict';
 

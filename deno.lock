@@ -31,5 +31,55 @@
     "https://deno.land/x/kv_toolbox@0.0.2/keys.ts": "161bb4cfe9b7625a7b55d5f7e545ace34add39e58d2a0e5e67750f185789f3ac",
     "https://deno.land/x/lz4@v0.1.2/mod.ts": "4decfc1a3569d03fd1813bd39128b71c8f082850fe98ecfdde20025772916582",
     "https://deno.land/x/lz4@v0.1.2/wasm.js": "b9c65605327ba273f0c76a6dc596ec534d4cda0f0225d7a94ebc606782319e46"
+  },
+  "npm": {
+    "specifiers": {
+      "@types/serviceworker": "@types/serviceworker@0.0.68",
+      "tw5-typed": "tw5-typed@0.3.7"
+    },
+    "packages": {
+      "@types/codemirror@5.60.8": {
+        "integrity": "sha512-VjFgDF/eB+Aklcy15TtOTLQeMjTo07k7KAjql8OK5Dirr7a6sJY4T1uVBDuTVG9VEmn1uUsohOpYnVfgC6/jyw==",
+        "dependencies": {
+          "@types/tern": "@types/tern@0.23.4"
+        }
+      },
+      "@types/echarts@4.9.18": {
+        "integrity": "sha512-Qav4M1i1qmPemMywMnDGIbvIBB/9pdrDKLI1dyMho4Yz/ldCB3ry2zGeH0UhAhgmaoPgwYrCDo8xd1UeByz+rw==",
+        "dependencies": {
+          "@types/zrender": "@types/zrender@4.0.3"
+        }
+      },
+      "@types/estree@1.0.1": {
+        "integrity": "sha512-LG4opVs2ANWZ1TJoKc937iMmNstM/d0ae1vNbnBvBhqCSezgVUOzcLCqbI5elV8Vy6WKwKjaqR+zO9VKirBBCA==",
+        "dependencies": {}
+      },
+      "@types/node@18.16.18": {
+        "integrity": "sha512-/aNaQZD0+iSBAGnvvN2Cx92HqE5sZCPZtx2TsK+4nvV23fFe09jVDvpArXr2j9DnYlzuU9WuoykDDc6wqvpNcw==",
+        "dependencies": {}
+      },
+      "@types/serviceworker@0.0.68": {
+        "integrity": "sha512-/p+SnnDBB2liGDTYRir7+qIdYBjCPGK8TqgUnzmdr7NLTjgCG2z454Glc8CqLiqCivEtozPpEu10/2p/XkMVAg==",
+        "dependencies": {}
+      },
+      "@types/tern@0.23.4": {
+        "integrity": "sha512-JAUw1iXGO1qaWwEOzxTKJZ/5JxVeON9kvGZ/osgZaJImBnyjyn0cjovPsf6FNLmyGY8Vw9DoXZCMlfMkMwHRWg==",
+        "dependencies": {
+          "@types/estree": "@types/estree@1.0.1"
+        }
+      },
+      "@types/zrender@4.0.3": {
+        "integrity": "sha512-EPI269lkHNsObwILJ1k1z7znLjKyePuWRy/XKK0shSGpBb9cIX307arcwJV4+2NeZj5wEjN06r4D8yFv7sI06g==",
+        "dependencies": {}
+      },
+      "tw5-typed@0.3.7": {
+        "integrity": "sha512-p4l6wexi6dctWpSxW7D4lZqdFK7mIcNSO+JmHA/ShtL7LMyk4OkWN5pUlm6Ea27GCipOvQJbuPNk8LsKzh+N9g==",
+        "dependencies": {
+          "@types/codemirror": "@types/codemirror@5.60.8",
+          "@types/echarts": "@types/echarts@4.9.18",
+          "@types/node": "@types/node@18.16.18"
+        }
+      }
+    }
   }
 }

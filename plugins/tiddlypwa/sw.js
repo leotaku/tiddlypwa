@@ -5,6 +5,8 @@ type: application/javascript
 Licensed under 0BSD, see license.tid.
 Formatted with `deno fmt`.
 \*/
+/// <reference no-default-lib="true" />
+/// <reference types="npm:@types/serviceworker" />
 const CACHE = 'tiddlypwa';
 
 async function fromNetCaching(req, cacheResp) {
