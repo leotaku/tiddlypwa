@@ -1,0 +1,3 @@
+title: $:/plugins/valpackett/tiddlypwa/notif-refresh
+
+~TiddlyWiki has been updated, please <$button message="tiddlypwa-browser-refresh">reload the page</$button>!

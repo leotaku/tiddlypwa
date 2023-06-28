@@ -1,5 +1,0 @@
-title: $:/plugins/valpackett/tiddlypwa-offline/readme
-
-!! ~TiddlyPWA Offline
-
-This plugin registers and manages a Service Worker for offline support.

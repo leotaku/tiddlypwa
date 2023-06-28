@@ -267,6 +267,10 @@ Formatted with `deno fmt`.
 			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-browser-refresh', (_evt) => {
+				location.reload(); // tm-browser-refresh passes 'true' which skips the serviceworker. silly!
+			});
+
+			$tw.rootWidget.addEventListener('tiddlypwa-browser-refresh-force', (_evt) => {
 				$tw.syncer.isDirty = () => false; // skip the onbeforeunload
 				location.reload(); // tm-browser-refresh passes 'true' which skips the serviceworker. silly!
 			});
@@ -282,6 +286,22 @@ Formatted with `deno fmt`.
 			$tw.rootWidget.addEventListener('tiddlypwa-sync', (_evt) => {
 				this.sync(false);
 			});
+		}
+
+		async initServiceWorker() {
+			try {
+				const reg = await navigator.serviceWorker.register('sw.js');
+				await reg.update();
+			} catch (e) {
+				if (!navigator.onLine) return;
+				$tw.wiki.addTiddler({ title: '$:/status/TiddlyPWAWorkerError', text: e.message });
+				$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-sw-error');
+			}
+			navigator.serviceWorker.onmessage = (evt) => {
+				if (evt.data.op == 'refresh') {
+					$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-refresh');
+				}
+			};
 		}
 
 		async _startRealtimeMonitor() {
@@ -704,6 +724,7 @@ Formatted with `deno fmt`.
 				title: '$:/status/TiddlyPWASalt',
 				text: await b64enc(this.salt),
 			});
+			this.initServiceWorker(); // don't await
 		}
 
 		getStatus(cb) {
@@ -842,7 +863,7 @@ Formatted with `deno fmt`.
 				$tw.wiki.getTiddlerText('$:/config/SaveWikiButton/Template', '$:/core/save/all'),
 				{ variables },
 			);
-			const swjs = $tw.wiki.renderTiddler('text/plain', '$:/plugins/valpackett/tiddlypwa-offline/sw.js', {});
+			const swjs = $tw.wiki.renderTiddler('text/plain', '$:/plugins/valpackett/tiddlypwa/sw.js', {});
 			try {
 				const servers = (variables.uploadUrl && variables.uploadToken)
 					? [{ url: variables.uploadUrl, token: variables.uploadToken }]

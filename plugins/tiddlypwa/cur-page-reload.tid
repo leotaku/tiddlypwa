@@ -1,7 +1,7 @@
 title: $:/plugins/valpackett/tiddlypwa/cur-page-reload
 
 — ''current page'', 
-<$button message="tiddlypwa-browser-refresh" tooltip={{$:/language/Buttons/Refresh/Hint}} aria-label={{$:/language/Buttons/Refresh/Caption}} class=<<tv-config-toolbar-class>>>
+<$button message="tiddlypwa-browser-refresh-force" tooltip={{$:/language/Buttons/Refresh/Hint}} aria-label={{$:/language/Buttons/Refresh/Caption}} class=<<tv-config-toolbar-class>>>
 {{$:/core/images/refresh-button}}
 <span class="tc-btn-text">
 <$text text={{$:/language/Buttons/Refresh/Caption}}/>
