@@ -188,10 +188,15 @@ Formatted with `deno fmt`.
 				(_evt) => {
 					this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: 'yes' });
 					if (this.db) {
+						this.backgroundSync();
 						this.startRealtimeMonitor();
 					}
 				},
 			);
+
+			document.addEventListener('visibilitychange', (_evt) => {
+				if (document.visibilityState === 'visible' && this.db) this.backgroundSync();
+			});
 
 			$tw.rootWidget.addEventListener('tiddlypwa-remember', (_evt) => {
 				if (!confirm('Are you sure you want to remember the password?')) {
@@ -744,6 +749,7 @@ Formatted with `deno fmt`.
 							lastSync: new Date(0),
 						}),
 					);
+					this.backgroundSync();
 				}
 				closeModal();
 			} else {
