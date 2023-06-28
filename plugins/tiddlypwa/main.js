@@ -194,6 +194,9 @@ Formatted with `deno fmt`.
 			);
 
 			$tw.rootWidget.addEventListener('tiddlypwa-remember', (_evt) => {
+				if (!confirm('Are you sure you want to remember the password?')) {
+					return;
+				}
 				this.db.transaction('session', 'readwrite').objectStore('session').put({ key: this.key, mackey: this.mackey })
 					.onsuccess = (
 						_evt,
@@ -724,9 +727,7 @@ Formatted with `deno fmt`.
 						['sign'],
 					);
 					checked = await this.initialRead();
-					if (checked) {
-						$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-opened');
-					} else {
+					if (!checked) {
 						feedback.innerHTML += '<p class=tiddlypwa-form-error>Wrong password!</p>';
 					}
 				}
