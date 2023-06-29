@@ -950,7 +950,7 @@ Formatted with `deno fmt`.
 						}
 						continue;
 					}
-					const href = new URL((await resp.json()).urlprefix + 'app.html', url).href;
+					const href = new URL((await resp.json()).urlprefix + 'app.html', new URL(url, document.location)).href;
 					const isCurrent = isCurrentUrl(href);
 					urls.push(
 						href + (isCurrent ? ' {{$:/plugins/valpackett/tiddlypwa/cur-page-reload}}' : ''),
