@@ -1,9 +1,17 @@
 title: $:/plugins/valpackett/tiddlypwa/readme
 
-!! ~TiddlyPWA Storage
+\define tv-wikilinks() no
 
-This plugin implements a ~SyncAdaptor that stores tiddlers in ~IndexedDB,
-encrypted using the Web Crypto API.
+!! ~TiddlyPWA
+
+TiddlyPWA is a storage and synchronization solution that turns TiddlyWiki into a proper
+Progressive Web App that works offline with local encrypted storage for all your tiddlers,
+and synchronizes your wiki across devices in real time using a tiny server app you can easily self-host for free.
+
+Read more about TiddlyPWA on [[the documentation website|https://tiddly.packett.cool/]].
+
+TiddlyPWA was created by [[Val Packett|https://val.packett.cool/]] ←
+please do [[throw some monies her way|https://www.patreon.com/valpackett]] :3
 
 <$button>
 <$action-setfield $tiddler="$:/state/tab-1749438307" text="$:/plugins/valpackett/tiddlypwa/config"/>

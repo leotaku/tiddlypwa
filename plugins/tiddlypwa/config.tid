@@ -2,14 +2,12 @@ title: $:/plugins/valpackett/tiddlypwa/config
 tags: $:/tags/ControlPanel
 caption: Storage and Sync
 
-\define tv-wikilinks() no
-
 <$reveal type="match" state="$:/status/TiddlyPWADocsMode" text="yes">
-TiddlyPWA is running in documentation/installer mode.
+[[TiddlyPWA|$:/plugins/valpackett/tiddlypwa]] is running in documentation/installer mode.
 </$reveal>
 
 <$reveal type="nomatch" state="$:/status/TiddlyPWADocsMode" text="yes">
-These settings let you configure TiddlyPWA.
+These settings let you configure [[TiddlyPWA|$:/plugins/valpackett/tiddlypwa]].
 
 <$macrocall $name="tabs" tabsList="[all[tiddlers+shadows]tag[$:/tags/ControlPanel/TiddlyPWA]!has[draft.of]]"
 default="$:/plugins/valpackett/tiddlypwa/config-storage" explicitState="$:/state/tab--84302341"/>

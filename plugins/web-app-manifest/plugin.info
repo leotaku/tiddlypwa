@@ -1,4 +1,5 @@
 {
+	"name": "Web App Manifest",
 	"title": "$:/plugins/valpackett/web-app-manifest",
 	"description": "Web Application Manifest generator",
 	"author": "Val Packett",
