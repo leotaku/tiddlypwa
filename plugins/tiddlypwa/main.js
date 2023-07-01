@@ -13,6 +13,10 @@ Formatted with `deno fmt`.
 
 	if (!$tw.browser) return;
 
+	// Patch this to make upgrading core by drag&drop reflect the version number in generated html
+	$tw.utils.extractVersionInfo = () => $tw.wiki.getTiddler('$:/core').fields.version;
+	Object.defineProperty($tw, 'version', { get: $tw.utils.extractVersionInfo });
+
 	const knownErrors = {
 		EAUTH: 'Wrong password and/or sync token',
 		EPROTO: 'Protocol incompatibility',
