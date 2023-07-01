@@ -159,7 +159,6 @@ Formatted with `deno fmt`.
 			this.deletedQueue = new Set();
 			this.changesChannel = new BroadcastChannel(`tiddlypwa-changes:${location.pathname}`);
 			this.changesChannel.onmessage = (evt) => {
-				if (evt.data.title === '$:/StoryList') return; // don't mess with viewing different things in multiple tabs
 				this.logger.log('Change from another tab');
 				if (evt.data.del) {
 					this.deletedQueue.add(evt.data.title);
@@ -453,27 +452,28 @@ Formatted with `deno fmt`.
 				this.loadedStoryList = true; // not truly "loaded" but as in "enable saving it to the DB"
 				return true;
 			}
-			let hasStoryList = false;
+			let hasStoryList = false, hasDefaultTiddlers = false;
 			for (const { thash, title, tiv, deleted } of titlesToRead) {
 				try {
 					if (arrayEq(thash, this.storyListHash)) hasStoryList = true;
-					if (deleted) {
-						continue;
-					}
-					const dectitle = await crypto.subtle.decrypt(
-						{ name: 'AES-GCM', iv: tiv },
-						this.key,
-						title,
-					);
-					this.modifiedQueue.add(utfdec.decode(dectitle).trimStart());
+					if (deleted) continue;
+					const dectitle = utfdec.decode(
+						await crypto.subtle.decrypt(
+							{ name: 'AES-GCM', iv: tiv },
+							this.key,
+							title,
+						),
+					).trimStart();
+					if (dectitle === '$:/DefaultTiddlers') hasDefaultTiddlers = true;
+					this.modifiedQueue.add(dectitle);
 				} catch (e) {
 					this.logger.log('Title decrypt failed:', e);
 					return false;
 				}
 			}
-			if (!hasStoryList) {
-				this.loadedStoryList = true; // not truly "loaded" but as in "enable saving it to the DB"
-			}
+			// consider these "loaded" if they did not exist in order to enable saving / let startup-opening proceed
+			if (!hasStoryList) this.loadedStoryList = true;
+			if (!hasDefaultTiddlers) this.loadedDefaultTiddlers = true;
 			this.backgroundSync();
 			setTimeout(() => {
 				try {
@@ -838,7 +838,10 @@ Formatted with `deno fmt`.
 
 		saveTiddler(tiddler, cb) {
 			if (tiddler.fields.title === '$:/StoryList' && !this.loadedStoryList) {
-				// Avoid saving the pre-DB-open StoryList!
+				this.logger.log(
+					'Not saving $:/StoryList the first time (the one from before opening), it was:',
+					tiddler.fields.list,
+				);
 				return cb(null, '', 1);
 			}
 			if (tiddler.fields.title === '$:/Import') {
@@ -875,6 +878,15 @@ Formatted with `deno fmt`.
 					$tw.syncer.filterFn = this.wiki.compileFilter(tiddler.text);
 				}
 				if (title === '$:/StoryList') this.loadedStoryList = true;
+				if (title === '$:/DefaultTiddlers') this.loadedDefaultTiddlers = true;
+				if (!this.openedDefaultTiddlers && this.loadedDefaultTiddlers && this.loadedStoryList) {
+					this.openedDefaultTiddlers = true;
+					// Old $:/DefaultTiddlers has been used, rerun (XXX: openStartupTiddlers should be exported)
+					const aEL = $tw.rootWidget.addEventListener;
+					$tw.rootWidget.addEventListener = () => {};
+					require('$:/core/modules/startup/story.js').startup();
+					$tw.rootWidget.addEventListener = aEL;
+				}
 			}).catch((e) => cb(e));
 		}
 
@@ -1105,8 +1117,10 @@ Formatted with `deno fmt`.
 						title,
 					),
 				).trimStart();
-				this.modifiedQueue.add(dectitle);
-				this.changesChannel.postMessage({ title: dectitle });
+				if (dectitle !== '$:/StoryList') {
+					this.modifiedQueue.add(dectitle);
+					this.changesChannel.postMessage({ title: dectitle });
+				}
 			}
 			if (appEtag && navigator.serviceWorker.controller) {
 				const cache = await caches.open('tiddlypwa');
