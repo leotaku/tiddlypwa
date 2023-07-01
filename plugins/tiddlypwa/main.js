@@ -345,9 +345,10 @@ Formatted with `deno fmt`.
 			}
 			const server = servers[~~(Math.random() * servers.length)];
 			const url = new URL(server.url, document.location);
+			const bareUrl = url;
 			this.wiki.addTiddler({
 				title: '$:/status/TiddlyPWARealtime',
-				text: `connecting to ${url}`,
+				text: `connecting to ${bareUrl}`,
 			});
 			url.searchParams.set('op', 'monitor');
 			url.searchParams.set('token', server.token);
@@ -357,7 +358,7 @@ Formatted with `deno fmt`.
 				this.monitorTimeout = 2000;
 				this.wiki.addTiddler({
 					title: '$:/status/TiddlyPWARealtime',
-					text: `connected to ${url}`,
+					text: `connected to ${bareUrl}`,
 				});
 			};
 			this.monitorStream.addEventListener('sync', (_evt) => this.backgroundSync());
