@@ -1178,7 +1178,7 @@ Formatted with `deno fmt`.
 		}
 
 		backgroundSync() {
-			if (!navigator.onLine || !this.db) return;
+			if (!navigator.onLine || !this.isReady()) return;
 			// debounced to handle multiple saves in quick succession
 			clearTimeout(this.syncTimer);
 			this.syncTimer = setTimeout(() => this.sync(false), 1000);
