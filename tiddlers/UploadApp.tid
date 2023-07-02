@@ -1,0 +1,6 @@
+title: UploadApp
+tags: [[TiddlyPWA Docs]]
+
+{{$:/plugins/valpackett/tiddlypwa/upload-app-form}}
+
+{{$:/status/TiddlyPWAUploadResult}}

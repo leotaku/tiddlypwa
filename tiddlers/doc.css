@@ -1,0 +1,29 @@
+/*\
+title: $:/doc.css
+tags: $:/tags/Stylesheet [[TiddlyPWA Docs]]
+type: text/css
+
+Licensed under 0BSD, see license.tid.
+\*/
+
+[data-tiddler-title="TiddlyPWA"] .tc-tiddler-body { text-align: center; }
+
+.tpwadoc-logos { display: flex; margin: 1rem 0; gap: .5rem; user-select: none; pointer-events: none; }
+.tpwadoc-logos > :first-child { width: 35%; }
+.tpwadoc-logos > :last-child { margin-right: 1rem; }
+
+.tpwadoc-card { display: block; text-align: center; background: var(--bg, #fff); color: #333; text-decoration: none; border-radius: 5px; padding: 1.5rem 1rem; transition: ease-in-out .3s transform; }
+.tpwadoc-card:hover { transform: scale(1.025) rotateZ(1deg); box-shadow: 0 0 8px 1px var(--bg, #fff); }
+.tpwadoc-icon { font-size: 2.5rem; height: 2.6rem; }
+.tpwadoc-title { font-weight: bolder; height: 1.7rem; }
+
+.tpwadoc-row { display: flex; gap: 1rem; }
+.tpwadoc-row > * { flex: 1 1 0; }
+@media screen and (max-width:690px) { .tpwadoc-row { flex-direction: column; } }
+
+.tpwadoc-card-sync {--bg:#93ebff;}
+.tpwadoc-card-crypt {--bg:#fbd16c;}
+.tpwadoc-card-host {--bg:#ffc8e7;}
+.tpwadoc-card-upload {--bg:#e0ffdf;}
+.tpwadoc-card-codeberg {--bg:#b8aeff;}
+.tpwadoc-card-patreon {--bg:#ffab91;}
