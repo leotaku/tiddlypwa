@@ -17,6 +17,22 @@ Formatted with `deno fmt`.
 	$tw.utils.extractVersionInfo = () => $tw.wiki.getTiddler('$:/core').fields.version;
 	Object.defineProperty($tw, 'version', { get: $tw.utils.extractVersionInfo });
 
+	// As of mid 2023 only Firefox has this natively
+	if (typeof ReadableStream === 'function' && !ReadableStream.prototype[Symbol.asyncIterator]) {
+		ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
+			const reader = this.getReader();
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) return;
+					yield value;
+				}
+			} finally {
+				reader.releaseLock();
+			}
+		};
+	}
+
 	const knownErrors = {
 		EAUTH: 'Wrong password and/or sync token',
 		EPROTO: 'Protocol incompatibility',
