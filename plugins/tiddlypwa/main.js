@@ -221,7 +221,10 @@ Formatted with `deno fmt`.
 				if (!confirm('Are you sure you want to remember the password?')) {
 					return;
 				}
-				this.db.transaction('session', 'readwrite').objectStore('session').put({ key: this.key, mackey: this.mackey })
+				this.db.transaction('session', 'readwrite').objectStore('session').put({
+					enckeys: this.enckeys,
+					mackey: this.mackey,
+				})
 					.onsuccess = (
 						_evt,
 					) => {
@@ -446,7 +449,7 @@ Formatted with `deno fmt`.
 		}
 
 		isReady() {
-			return !!(this.db && this.key);
+			return !!(this.db && this.enckeys);
 		}
 
 		async initialRead() {
@@ -477,7 +480,7 @@ Formatted with `deno fmt`.
 					const dectitle = utfdec.decode(
 						await crypto.subtle.decrypt(
 							{ name: 'AES-GCM', iv: tiv },
-							this.key,
+							this.enckey(thash),
 							title,
 						),
 					).trimStart();
@@ -549,15 +552,15 @@ Formatted with `deno fmt`.
 					this.salt = meta[meta.length - 1].salt;
 				}
 			}
-			if (this.db && !this.key) {
+			if (this.db && !this.enckeys) {
 				const ses = await adb(this.db.transaction('session').objectStore('session').getAll());
 				if (ses.length > 0) {
-					this.key = ses[ses.length - 1].key;
+					this.enckeys = ses[ses.length - 1].enckeys;
 					this.mackey = ses[ses.length - 1].mackey;
 				}
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: ses.length > 0 ? 'yes' : 'no' });
 			}
-			if (!this.key) {
+			if (!this.enckeys) {
 				let bootstrapEndpoint;
 				$tw.utils.addClass($tw.pageContainer, 'tc-modal-displayed');
 				$tw.utils.addClass(document.body, 'tc-modal-prevent-scroll');
@@ -740,16 +743,28 @@ Formatted with `deno fmt`.
 					});
 					if (!this.salt) this.salt = crypto.getRandomValues(new Uint8Array(32));
 					console.time('hash');
-					const basebits = await argon.hash(utfenc.encode(passInput.value), this.salt, { m: 1 << 17 });
+					const basebits = await argon.hash(utfenc.encode(passInput.value), this.salt, { m: 1 << 17, t: 2 });
 					console.timeLog('hash');
 					const basekey = await crypto.subtle.importKey('raw', basebits, 'HKDF', false, ['deriveKey']);
 					// fun: https://soatok.blog/2021/11/17/understanding-hkdf/ (but we don't have any randomness to shove into info)
-					this.key = await crypto.subtle.deriveKey(
-						{ name: 'HKDF', hash: 'SHA-256', salt: utfenc.encode('tiddly.pwa.tiddlers'), info: new Uint8Array() },
-						basekey,
-						{ name: 'AES-GCM', length: 256 },
-						false,
-						['encrypt', 'decrypt'],
+					// not fun: https://soatok.blog/2020/12/24/cryptographic-wear-out-for-symmetric-encryption/
+					// realistically 4 billion encryptions is already actually *a lot* for a notes app even with really heavy use lol
+					// but by having just 8 keys we get to 34 billion which is Better
+					this.enckeys = await Promise.all(
+						[...Array(8).keys()].map((i) =>
+							crypto.subtle.deriveKey(
+								{
+									name: 'HKDF',
+									hash: 'SHA-256',
+									salt: utfenc.encode('tiddly.pwa.tiddlers.' + i),
+									info: new Uint8Array(),
+								},
+								basekey,
+								{ name: 'AES-GCM', length: 256 },
+								false,
+								['encrypt', 'decrypt'],
+							)
+						),
 					);
 					this.mackey = await crypto.subtle.deriveKey(
 						{ name: 'HKDF', hash: 'SHA-256', salt: utfenc.encode('tiddly.pwa.titles'), info: new Uint8Array() },
@@ -827,16 +842,21 @@ Formatted with `deno fmt`.
 			return crypto.subtle.sign('HMAC', this.mackey, utfenc.encode(x));
 		}
 
+		enckey(thash) {
+			return this.enckeys[new DataView(thash).getUint8(0) % this.enckeys.length];
+		}
+
 		async _saveTiddler(tiddler) {
 			const thash = await this.titlehash(tiddler.fields.title);
+			const key = this.enckey(thash);
 			const encoded = await encodeTiddler(tiddler, this.wiki.isBinaryTiddler(tiddler.fields.title));
 			// "if you use nonces longer than 12 bytes, they get hashed into 12 bytes anyway" - soatok.blog
 			const iv = crypto.getRandomValues(new Uint8Array(12));
-			const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this.key, encoded);
+			const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
 			const tiv = crypto.getRandomValues(new Uint8Array(12));
 			const title = await crypto.subtle.encrypt(
 				{ name: 'AES-GCM', iv: tiv },
-				this.key,
+				key,
 				utfenc.encode('\n'.repeat(64 - (tiddler.fields.title.length % 64)) + tiddler.fields.title),
 			);
 			await adb(
@@ -883,7 +903,7 @@ Formatted with `deno fmt`.
 			const thash = await this.titlehash(title);
 			const obj = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').get(thash));
 			if (obj.deleted) return null;
-			const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.iv }, this.key, obj.data);
+			const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.iv }, this.enckey(thash), obj.data);
 			return await decodeTiddler(data);
 		}
 
@@ -1114,7 +1134,7 @@ Formatted with `deno fmt`.
 				if (deleted) {
 					titleHashesToDelete.add(thash);
 				} else {
-					titlesToRead.push({ title: tid.title, iv: tid.tiv });
+					titlesToRead.push({ title: tid.title, thash: tid.thash, iv: tid.tiv });
 				}
 				if (tid.mtime > newestChg) {
 					newestChg = tid.mtime;
@@ -1126,11 +1146,11 @@ Formatted with `deno fmt`.
 					this.changesChannel.postMessage({ title, del: true });
 				}
 			}
-			for (const { title, iv } of titlesToRead) {
+			for (const { title, thash, iv } of titlesToRead) {
 				const dectitle = utfdec.decode(
 					await crypto.subtle.decrypt(
 						{ name: 'AES-GCM', iv },
-						this.key,
+						this.enckey(thash),
 						title,
 					),
 				).trimStart();
