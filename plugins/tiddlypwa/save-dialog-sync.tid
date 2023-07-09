@@ -13,7 +13,7 @@ TiddlyPWA automatically synchronizes changes to your content tiddlers with sync 
 
 {{$:/plugins/valpackett/tiddlypwa/sync-status}}
 
-<table style="width:100%">
+<table class="tc-table-no-border tc-max-width">
 <thead>
     <tr>
         <td>Server</td>

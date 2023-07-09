@@ -13,7 +13,7 @@ caption: Synchronization
 
 This device/browser syncs wiki contents with the following servers:
 
-<table style="width:100%">
+<table class="tc-table-no-border tc-max-width">
 <thead>
     <tr>
         <td>Server</td>
@@ -43,10 +43,7 @@ This device/browser syncs wiki contents with the following servers:
 
 </$reveal>
 
-<label>URL: <$edit-text tiddler="$:/temp/TiddlyPWAServerURL" tag="input" default="https://" /></label>
-<label>Token: <$edit-text tiddler="$:/temp/TiddlyPWAServerToken" tag="input" default="" /></label>
-<$button>
-<$action-sendmessage $message="tiddlypwa-add-sync-server"
-    url={{$:/temp/TiddlyPWAServerURL}} token={{$:/temp/TiddlyPWAServerToken}} />
-Add
-</$button>
+|tc-table-no-border tc-max-width tc-first-col-min-width|k
+| URL|<$edit-text id="tpwa-endpoint-url" tiddler="$:/temp/TiddlyPWAServerURL" tag="input" default="https://" /> |
+| Token|<$edit-text tiddler="$:/temp/TiddlyPWAServerToken" tag="input" default="" /> |
+| |<$button><$action-sendmessage $message="tiddlypwa-add-sync-server" url={{$:/temp/TiddlyPWAServerURL}} token={{$:/temp/TiddlyPWAServerToken}} />Add</$button> |
