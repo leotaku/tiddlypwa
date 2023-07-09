@@ -598,6 +598,7 @@ Formatted with `deno fmt`.
 					opened = true;
 					wrapper.appendChild(modal);
 					clearTimeout(timeoutModal);
+					modal.querySelector('input')?.focus();
 				};
 				const closeModal = () => {
 					document.body.removeChild(wrapper);
