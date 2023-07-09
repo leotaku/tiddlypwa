@@ -9,8 +9,12 @@ subtitle: Saving and Exporting
 
 <$reveal type="match" state="$:/status/RequireReloadDueToPluginChange" text="yes">
 
-To finish the installation of plugins/themes/languages, you need to save and reload the app:
+To finish the installation of plugins/themes/languages, you need to save and reload the app wiki.
 
+<$reveal type="lteq" state="$:/status/TiddlyPWAServerCount" text="0">
+You do not have sync servers configured, so you can only do this manually below in the "{{$:/plugins/valpackett/tiddlypwa/save-dialog-app!!caption}}" tab.
+</$reveal>
+<$reveal type="gt" state="$:/status/TiddlyPWAServerCount" text="0">
 <$reveal type="match" state="$:/isEncrypted" text="yes">
 But first, disable single-file encryption: {{$:/core/ui/Buttons/encryption}}!
 </$reveal>
@@ -22,11 +26,9 @@ Upload it to sync servers
 </$button>!
 </$reveal>
 </$reveal>
-
-{{$:/status/TiddlyPWAUploadResult}}
-
-You can also use the "Advanced App Management" tab below to upload the app with these modifications to any other server or save it locally.
-
+You can also use the "{{$:/plugins/valpackett/tiddlypwa/save-dialog-app!!caption}}" tab below to upload the app with these modifications to any other server or save it locally.
+<p>{{$:/status/TiddlyPWAUploadResult}}</p>
+</$reveal>
 </$reveal>
 
 <$reveal type="nomatch" state="$:/status/RequireReloadDueToPluginChange" text="yes">

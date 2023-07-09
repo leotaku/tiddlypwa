@@ -4,9 +4,14 @@ caption: Synchronization
 
 \define tv-wikilinks() no
 
+<$reveal type="lteq" state="$:/status/TiddlyPWAServerCount" text="0">
+<p>You do not have sync servers configured. Add one below!</p>
+</$reveal>
+<$reveal type="gt" state="$:/status/TiddlyPWAServerCount" text="0">
+
 {{$:/plugins/valpackett/tiddlypwa/sync-status}}
 
-This device syncs wiki contents with the following servers:
+This device/browser syncs wiki contents with the following servers:
 
 <table style="width:100%">
 <thead>
@@ -35,6 +40,8 @@ This device syncs wiki contents with the following servers:
     </tr>
 </$list>
 </table>
+
+</$reveal>
 
 <label>URL: <$edit-text tiddler="$:/temp/TiddlyPWAServerURL" tag="input" default="https://" /></label>
 <label>Token: <$edit-text tiddler="$:/temp/TiddlyPWAServerToken" tag="input" default="" /></label>

@@ -2,13 +2,11 @@ title: $:/plugins/valpackett/tiddlypwa/readme
 
 \define tv-wikilinks() no
 
-!! ~TiddlyPWA
-
 TiddlyPWA is a storage and synchronization solution that turns TiddlyWiki into a proper
 Progressive Web App that works offline with local encrypted storage for all your tiddlers,
 and synchronizes your wiki across devices in real time using a tiny server app you can easily self-host for free.
 
-Read more about TiddlyPWA on [[the documentation website|https://tiddly.packett.cool/]].
+Read more about TiddlyPWA on <a href={{$:/plugins/valpackett/tiddlypwa!!demo}}>the documentation website</a>!
 
 TiddlyPWA was created by [[Val Packett|https://val.packett.cool/]] ←
 please do [[throw some monies her way|https://www.patreon.com/valpackett]] :3

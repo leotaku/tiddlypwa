@@ -1,4 +1,0 @@
-title: $:/plugins/valpackett/tiddlypwa/notif-newwiki
-
-Fresh wiki storage initialized with new password!
-You can <$button message="tiddlypwa-remember">remember your password</$button> if this device is trusted.

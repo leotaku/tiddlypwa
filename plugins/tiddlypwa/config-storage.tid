@@ -16,11 +16,8 @@ It's a good idea to <$button message="tiddlypwa-enable-persistence">enable it</$
 to make sure the local wiki data would never get automatically purged.
 </$reveal>
 
-<$reveal type="match" state="$:/status/TiddlyPWAStorageQuota" text="unavail">
-Storage usage information is unavailable in this browser.
-</$reveal>
 <$reveal type="nomatch" state="$:/status/TiddlyPWAStorageQuota" text="unavail">
-Browser storage usage estimate (may be weird): {{$:/status/TiddlyPWAStorageQuota}}
+Browser storage usage estimate (weird nonsense usually): {{$:/status/TiddlyPWAStorageQuota}}
 </$reveal>
 
 You can <$button message="tiddlypwa-drop-db">clear storage</$button> if you want to destroy

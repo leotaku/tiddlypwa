@@ -197,6 +197,8 @@ Formatted with `deno fmt`.
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: evt.data ? 'yes' : 'no' });
 			};
 
+			this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOrigin', text: location.origin });
+
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWAOnline', text: navigator.onLine ? 'yes' : 'no' });
 			window.addEventListener(
 				'offline',
@@ -410,12 +412,13 @@ Formatted with `deno fmt`.
 			}, this.monitorTimeout);
 		}
 
-		reflectSyncServers() {
+		async reflectSyncServers() {
 			this.startRealtimeMonitor();
 			for (const tidname of this.wiki.getTiddlersWithTag('$:/temp/TiddlyPWAServer')) {
 				this.wiki.deleteTiddler(tidname);
 			}
-			return new Promise((resolve) =>
+			let cnt = 0;
+			await new Promise((resolve) =>
 				this.db.transaction('syncservers').objectStore('syncservers').openCursor().onsuccess = (evt) => {
 					const cursor = evt.target.result;
 					if (!cursor) {
@@ -430,9 +433,11 @@ Formatted with `deno fmt`.
 						token,
 						lastSync: lastSync?.getTime() === 0 ? 'never' : lastSync?.toLocaleString(),
 					});
+					cnt++;
 					cursor.continue();
 				}
 			);
+			this.wiki.addTiddler({ title: '$:/status/TiddlyPWAServerCount', text: cnt.toString() });
 		}
 
 		async reflectStorageInfo() {
@@ -467,8 +472,6 @@ Formatted with `deno fmt`.
 				};
 			});
 			if (titlesToRead.length === 0) {
-				$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-newwiki');
-				$tw.wiki.addToStory('$:/ControlPanel');
 				this.loadedStoryList = true; // not truly "loaded" but as in "enable saving it to the DB"
 				return true;
 			}
@@ -804,6 +807,7 @@ Formatted with `deno fmt`.
 				text: await b64enc(this.salt),
 			});
 			this.initServiceWorker(); // don't await
+			if (freshDb) navigator.storage.persist().then(() => this.reflectStorageInfo());
 		}
 
 		getStatus(cb) {

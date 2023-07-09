@@ -1,0 +1,63 @@
+title: GettingStarted
+
+\define lingo-base() $:/language/ControlPanel/Basics/
+
+<$set name="tv-config-toolbar-icons" value="yes">
+<$set name="tv-config-toolbar-text" value="yes">
+<$set name="tv-config-toolbar-class" value="">
+
+Welcome to your new ~TiddlyWiki super-powered by [[TiddlyPWA|$:/plugins/valpackett/tiddlypwa]]!
+
+!! Set up this ~TiddlyWiki
+
+<div class="tc-control-panel">
+
+|tc-table-no-border tc-first-col-min-width tc-first-link-nowrap|k
+| <$link to="$:/SiteTitle"><<lingo Title/Prompt>></$link>|<$edit-text tiddler="$:/SiteTitle" default="" tag="input"/> |
+| <$link to="$:/SiteSubtitle"><<lingo Subtitle/Prompt>></$link>|<$edit-text tiddler="$:/SiteSubtitle" default="" tag="input"/> |
+|^ <$link to="$:/DefaultTiddlers"><<lingo DefaultTiddlers/Prompt>></$link><br><<lingo DefaultTiddlers/TopHint>>|<$edit tag="textarea" tiddler="$:/DefaultTiddlers"/><br>//<<lingo DefaultTiddlers/BottomHint>>// |
+</div>
+
+See the [[control panel|$:/ControlPanel]] for more options, but read the following section first!
+
+!! Set up ~TiddlyPWA
+
+<$reveal type="match" state="$:/status/TiddlyPWAStoragePersisted" text="unavail">
+''Persistent storage support is unavailable right now, be careful, your data might be deleted by your browser''.
+Make sure to use synchronization.
+</$reveal>
+<$reveal type="match" state="$:/status/TiddlyPWAStoragePersisted" text="no">
+You have not enabled persistent storage, you really <$button message="tiddlypwa-enable-persistence">should</$button> do so
+to make sure the local wiki data would never get automatically purged by your browser.
+If you have blocked the permission and the button does nothing, check the permission icon in your address bar if there is one, or refresh the page.
+</$reveal>
+
+<$reveal type="match" state="$:/status/TiddlyPWARemembered" text="yes">
+You have remembered the password on this device/browser. <$button message="tiddlypwa-forget">Undo</$button>?
+</$reveal>
+<$reveal type="nomatch" state="$:/status/TiddlyPWARemembered" text="yes">
+If you do not want to type the password here every time, you can <$button message="tiddlypwa-remember">remember it</$button>, but be warned:
+this would leave the contents of this wiki unprotected on this device/browser, and it would be possible to access them from any web page hosted on this
+[[origin|https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy]] (<code>{{$:/status/TiddlyPWAOrigin}}</code>).
+</$reveal>
+
+<$reveal type="gt" state="$:/status/TiddlyPWAServerCount" text="0">
+You already have a sync server configured, so your changes are automatically synchronized between local storage and the server when you are online. Enjoy!
+</$reveal>
+<$reveal type="lteq" state="$:/status/TiddlyPWAServerCount" text="0">
+You do not have a sync server configured, so your changes are currently only stored in this device/browser. You can
+<$button>
+<$action-setfield $tiddler="$:/state/tab-1749438307" text="$:/plugins/valpackett/tiddlypwa/config"/>
+<$action-setfield $tiddler="$:/state/tab--84302341" text="$:/plugins/valpackett/tiddlypwa/config-sync"/>
+<$action-navigate $to="$:/ControlPanel"/>
+configure a sync server in the control panel
+</$button>.
+</$reveal>
+
+Do make backups of your content, especially since TiddlyPWA is still beta quality software!
+You can use the {{$:/core/ui/Buttons/export-page}} feature (which does not provide encryption), but you can also use
+the "{{$:/plugins/valpackett/tiddlypwa/save-dialog-export!!caption}}" tab in the {{$:/core/ui/Buttons/save-wiki}} menu to export the wiki as a traditional single-file TiddlyWiki
+(with encryption if you want).
+
+To learn more about how TiddlyPWA works and to support the author, visit <a href={{$:/plugins/valpackett/tiddlypwa!!demo}}>the official website</a>.
+Enjoy your wiki!

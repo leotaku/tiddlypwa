@@ -4,6 +4,15 @@ caption: Sync Status
 
 \define tv-wikilinks() no
 
+<$reveal type="lteq" state="$:/status/TiddlyPWAServerCount" text="0">
+<p>You do not have a sync server configured. You can set one up in the control panel.</p>
+</$reveal>
+<$reveal type="gt" state="$:/status/TiddlyPWAServerCount" text="0">
+
+TiddlyPWA automatically synchronizes changes to your content tiddlers with sync servers!
+
+{{$:/plugins/valpackett/tiddlypwa/sync-status}}
+
 <table style="width:100%">
 <thead>
     <tr>
@@ -19,4 +28,4 @@ caption: Sync Status
 </$list>
 </table>
 
-{{$:/plugins/valpackett/tiddlypwa/sync-status}}
+</$reveal>

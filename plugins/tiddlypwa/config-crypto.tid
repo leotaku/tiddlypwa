@@ -13,7 +13,9 @@ The password (or technically, the encryption key derived from it) is currently
 </$reveal>
 
 (Warning: remembering the password would leave the contents of this wiki unprotected on the local device,
-including from other wikis or other apps hosted on this ''domain''.)
+including from other wikis or other apps hosted on this 
+[[origin|https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy]] (<code>{{$:/status/TiddlyPWAOrigin}}</code>).
+Do not do this if you store secrets here!)
 
 The salt value for this wiki is: <code>{{$:/status/TiddlyPWASalt}}</code>
 (if you were to manually initialize a new one to sync with this one, you would need to copy this value).
