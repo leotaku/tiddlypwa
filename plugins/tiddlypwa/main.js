@@ -13,6 +13,15 @@ Formatted with `deno fmt`.
 
 	if (!$tw.browser) return;
 
+	// Do this early to make it work on login screen too
+	if ('serviceWorker' in navigator) {
+		navigator.serviceWorker.onmessage = (evt) => {
+			if (evt.data.op == 'refresh') {
+				$tw.wiki.addTiddler({ title: '$:/status/TiddlyPWAUpdateAvailable', text: 'yes' });
+			}
+		};
+	}
+
 	// Patch this to make upgrading core by drag&drop reflect the version number in generated html
 	$tw.utils.extractVersionInfo = () => $tw.wiki.getTiddler('$:/core').fields.version;
 	Object.defineProperty($tw, 'version', { get: $tw.utils.extractVersionInfo });
@@ -346,11 +355,6 @@ Formatted with `deno fmt`.
 				$tw.wiki.addTiddler({ title: '$:/status/TiddlyPWAWorkerError', text: e.message });
 				$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-sw-error');
 			}
-			navigator.serviceWorker.onmessage = (evt) => {
-				if (evt.data.op == 'refresh') {
-					$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-refresh');
-				}
-			};
 		}
 
 		async _startRealtimeMonitor() {

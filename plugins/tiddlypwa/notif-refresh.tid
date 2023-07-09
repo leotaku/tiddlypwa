@@ -1,3 +1,13 @@
 title: $:/plugins/valpackett/tiddlypwa/notif-refresh
+tags: $:/tags/PageTemplate
+
+<$reveal type="nomatch" state="$:/temp/HideUpdate" text="yes">
+<$reveal type="match" state="$:/status/TiddlyPWAUpdateAvailable" text="yes">
+<div class="tc-plugin-reload-warning" role="alert" style="z-index:2000">
 
 ~TiddlyWiki has been updated, please <$button message="tiddlypwa-browser-refresh">reload the page</$button>!
+<$button set="$:/temp/HideUpdate" setTo="yes" class="tc-btn-invisible">{{$:/core/images/close-button}}</$button>
+
+</div>
+</$reveal>
+</$reveal>
