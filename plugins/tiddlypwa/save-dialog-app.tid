@@ -20,22 +20,20 @@ However, that file (which we call "the app wiki") still stores ''plugins'' and '
 <p>Uploading…</p>
 </$reveal>
 <$reveal type="nomatch" state="$:/status/TiddlyPWAUploading" text="yes">
-<p>
+
 You can
 <$button>
 <$action-sendmessage $message="tiddlypwa-upload-app-wiki" publishFilter={{$:/plugins/valpackett/tiddlypwa/app-filter}} />
 upload the app wiki to sync servers
 </$button>
 now.
-</p>
 </$reveal>
 </$reveal>
 
 <details>
 <summary>Advanced options…</summary>
 <p>You can upload it to a sync server you are not currently syncing with:</p>
-<div>{{$:/plugins/valpackett/tiddlypwa/upload-app-form}}</div>
-
+<$transclude $tiddler="$:/plugins/valpackett/tiddlypwa/upload-app-form" $mode="block"/>
 <p>
 You can also
 <$button>
