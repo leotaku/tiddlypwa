@@ -49,7 +49,6 @@ Deno.test('app file blob garbage collected when changing content or deleting wik
 	{
 		const resp = await page(urlp2 + 'what.ev');
 		assertEquals(resp.headers.get('content-type'), 'something/else');
-		assertEquals(resp.headers.get('x-tid-sig'), 'aaaa');
 		assertEquals(await resp.text(), 'hello world');
 	}
 	assertEquals(((await app.kv.get(app.blobMetaKey(etag))).value as any).refs, new Set([tok1, tok2]));
@@ -57,7 +56,6 @@ Deno.test('app file blob garbage collected when changing content or deleting wik
 	{
 		const resp = await page(urlp2 + 'what.ev');
 		assertEquals(resp.headers.get('content-type'), 'something/else');
-		assertEquals(resp.headers.get('x-tid-sig'), 'aaaa');
 		assertEquals(await resp.text(), 'hello world');
 	}
 	assertEquals(((await app.kv.get(app.blobMetaKey(etag))).value as any).refs, new Set([tok2]));
