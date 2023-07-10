@@ -734,6 +734,7 @@ Formatted with `deno fmt`.
 				}
 				const AW = require('$:/plugins/valpackett/tiddlypwa/argon2ian.js').ArgonWorker;
 				const argon = new AW();
+				await argon.ready;
 				let checked = false;
 				while (!checked) {
 					submit.disabled = false;
