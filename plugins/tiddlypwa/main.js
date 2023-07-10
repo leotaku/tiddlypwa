@@ -26,6 +26,10 @@ Formatted with `deno fmt`.
 	$tw.utils.extractVersionInfo = () => $tw.wiki.getTiddler('$:/core').fields.version;
 	Object.defineProperty($tw, 'version', { get: $tw.utils.extractVersionInfo });
 
+	// Patch this to direct all plugins into the app wiki saving process
+	// (It gets called on a lot of junk that's not plugin info, so just detect actual plugins)
+	$tw.wiki.doesPluginInfoRequireReload = (x) => typeof x === 'object' && 'tiddlers' in x;
+
 	// As of mid 2023 only Firefox has this natively
 	if (typeof ReadableStream === 'function' && !ReadableStream.prototype[Symbol.asyncIterator]) {
 		ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
@@ -166,14 +170,6 @@ Formatted with `deno fmt`.
 	function isCurrentUrl(url) {
 		return url === `${location.origin}${location.pathname}${location.search}`;
 	}
-
-	function saveToApp(title) {
-		return title.startsWith('$:/themes/') ||
-			title.startsWith('$:/plugins/') ||
-			title.startsWith('$:/languages/');
-	}
-
-	$tw.wiki.doesPluginInfoRequireReload = (x) => x?.tiddlers && Object.keys(x.tiddlers).find(saveToApp);
 
 	class PWAStorage {
 		constructor(options) {
@@ -894,8 +890,7 @@ Formatted with `deno fmt`.
 				// For some reason this is not in the default $:/config/SyncFilter but no one would want this actually stored.
 				return cb(null, '', 1);
 			}
-			if (saveToApp(tiddler.fields.title)) {
-				// Attempting to only direct the `doesPluginRequireReload` ones into the file does not seem worth it.
+			if (tiddler.fields.type === 'application/json' && tiddler.fields['plugin-type']) {
 				// By ignoring the callback we make TW think there's something unsaved now, which there is!
 				return;
 			}
