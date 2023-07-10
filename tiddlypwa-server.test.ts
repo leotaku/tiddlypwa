@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 // deno test --unstable --allow-env --allow-read=.
 import 'https://deno.land/std@0.192.0/dotenv/load.ts';
 import { assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
@@ -15,7 +16,7 @@ const page = (path: string) => app.handle(new Request('http://example.com/' + pa
 
 const createWiki = () => api({ op: 'create', atoken: 'test' }).then((x) => x.token as string);
 const deleteWiki = (token: string) => api({ op: 'delete', atoken: 'test', token });
-const uploadAppFile = (token: string, body: string, extra?: object, file: string = 'app.html') =>
+const uploadAppFile = (token: string, body: string, extra?: Record<string, unknown>, file = 'app.html') =>
 	api({
 		op: 'uploadapp',
 		token,
@@ -39,7 +40,7 @@ Deno.test('app file blob garbage collected when changing content or deleting wik
 		assertEquals(await resp.text(), 'hello world');
 	}
 	const etag = ((await app.kv.get(app.wikiKey(tok1))).value as any).files.get('app.html').etag;
-	assertEquals((await (await app.kv.list({ prefix: app.blobKey(etag) })).next()).done, false);
+	assertEquals((await app.kv.list({ prefix: app.blobKey(etag) }).next()).done, false);
 	const { urlprefix: urlp2 } = await uploadAppFile(
 		tok2,
 		'hello world',
@@ -61,9 +62,9 @@ Deno.test('app file blob garbage collected when changing content or deleting wik
 	assertEquals(((await app.kv.get(app.blobMetaKey(etag))).value as any).refs, new Set([tok2]));
 	await uploadAppFile(tok2, 'mew content', {}, 'what.ev');
 	assertEquals((await app.kv.get(app.blobMetaKey(etag))).value as any, null);
-	assertEquals(await (await app.kv.list({ prefix: app.blobKey(etag) })).next(), { done: true, value: undefined });
+	assertEquals(await app.kv.list({ prefix: app.blobKey(etag) }).next(), { done: true, value: undefined });
 	const etagmew = ((await app.kv.get(app.wikiKey(tok2))).value as any).files.get('what.ev').etag;
 	await deleteWiki(tok2);
-	assertEquals(await (await app.kv.list({ prefix: app.blobKey(etagmew) })).next(), { done: true, value: undefined });
+	assertEquals(await app.kv.list({ prefix: app.blobKey(etagmew) }).next(), { done: true, value: undefined });
 	await deleteWiki(tok1);
 });
