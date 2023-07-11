@@ -1,0 +1,77 @@
+title: Encryption
+tags: [[TiddlyPWA Docs]]
+
+TiddlyPWA uses client-side (or "end-to-end") encryption for all content tiddlers, i.e. everything that gets stored in the
+browser local storage and [[synchronized|Synchronization]] between browsers and sync servers.
+
+Plugins/themes you install, as well as the most basic settings (title, subtitle, chosen theme, chosen palette, favicon)
+do get saved unencrypted when using the "Save App Wiki" functionality.
+
+The encryption accomplishes the following goals:
+
+* unless you use the "remember password" functionality, it prevents unauthorized local access (think giving your phone to a friend for a moment: if you don't leave the wiki open, they would not be able to read your secret notes without knowing your password);
+* it prevents snooping on the sync server side (be it the friend who hosts your server if you don't do it yourself, or the hosting provider).
+
+!! Active Attacks
+
+If you host the app wiki on the sync server, i.e. if you use the default recommended full experience, it is however true
+that an active server-side attacker could at any time "update" the app wiki to a malicious version that would leak
+your secrets to the attacker.
+To be frank, this is a very paranoid concern for the vast majority of use cases, especially with self-hosting:
+do you really expect your hosting provider to actively attack your personal wiki which contains boring not-that-secret data?
+
+However—because we can™—we can satisfy that paranoia.
+There are ways to improve that situation and eliminate or reduce the need to trust the sync server:
+
+!!! Separation of Trust
+
+You can simply not host the app wiki on the sync server and host it elsewhere.
+You could even just use it as a local HTML file and sync it separately using Syncthing for example,
+or trust a separate static web host instead of a sync server (say if you don't host a sync server but use your friends' one).
+The user experience is currently not optimized for this use case, but improvements won't be hard to implement.
+
+!!! Upgrading the trust model to Trust-On-First-Use
+
+[[If Service Workers supported a secure update mode|https://github.com/w3c/ServiceWorker/issues/822#issuecomment-1610850457]]
+it would be possible to just implement signature checking in the Service Worker and then the need to trust the server would be
+limited to the first time you open the wiki in a new browser/device – sneaking in a malicious update later would be instantly
+caught by the signature check failing. Unfortunately this is not currently available and Service Workers can always be bypassed
+(because the majority of web apps have an opposite concern: attackers shipping Service Workers from a compromised server).
+However, it should be possible to prototype this mode in a browser add-on…
+
+!!! Signature checking using browser add-ons
+
+[[Signed Pages|https://github.com/tasn/webext-signed-pages]] already exists, however it's based around [[PGP|https://latacora.micro.blog/2019/07/16/the-pgp-problem.html]]
+and does not do automatic TOFU enrollment. Rather, what is planned is the aforementioned prototype of an extension that would allow the web app to
+have its own signature checking in a Service Worker without worrying about bypasses – but it wouldn't be limited to the trust-on-first-use model,
+it would also allow loading public keys ahead of time!
+
+!! Encryption Scheme Technical Details
+
+TiddlyPWA uses the Argon2id password hash (with 128 MiB memory usage and 2 iterations) to derive key material from your wiki password.
+The parameters are picked to balance security and speed (waiting ages on a low-end phone would suck); if you are worried
+about password cracking, don't worry about them too much, rather pick a stronger, longer passphrase as your password.
+To calculate the Argon2 hash, a custom size-optimized [[WebAssembly build/wrapper|https://codeberg.org/valpackett/argon2ian]] is used.
+
+A random 32-byte salt for this hash is generated when initializing a new wiki. It was initially considered inconvenient to have one,
+but with the bootstrapping process that was added, the sync server passes the salt automatically with the default experience.
+If one does not host the wiki on a sync server however, to start syncing an existing wiki to a new browser/device,
+a wiki has to be initialized on it with the same salt (copied from the control panel) before adding the sync server.
+
+The derived key material is stretched using HKDF-SHA-256 into:
+
+* an HMAC-SHA-256 key used for keyed hashing, which is used for
+** hashing the tiddler titles for use as database lookup keys (keyed hashing is used to avoid title correlation across wikis!)
+** hashing the sync token to produce an "authcode" for each sync server (it's a value that's rememebered by the server on first sync and checked for matches on further syncs – this is just to prevent accidentally syncing different wikis (encrypted with different keys) into the same one)
+* eight AES-GCM-256 keys used for content encryption
+** one of eight keys is picked for each entry based on the title hash
+** this is a slight mitigation for [[key wear-out|https://soatok.blog/2020/12/24/cryptographic-wear-out-for-symmetric-encryption/]]
+*** 4 billion encryptions is already kind of a lot for personal notes storage, but 34 billion is just Better isn't it?
+** AES-GCM is [[not the best thing since sliced bread|https://soatok.blog/2020/05/13/why-aes-gcm-sucks/]], but it's used because it's natively available in the browser, with hardware acceleration and everything
+
+For each tiddler stored:
+
+* the title is hashed into a database key using HMAC-SHA-256
+* the tiddler content (possibly compressed, then padded to 256 bytes to avoid granular length leakage) is encrypted with AES-GCM-256 with a random 96-bit nonce
+* the title is encrypted (padded to 64 bytes to avoid granular length leakage) separately for performance using the same scheme
+* the modification time and the deleted flag are stored unencrypted (to make sync conflict resolution possible without having any keys)

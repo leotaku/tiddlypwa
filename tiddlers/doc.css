@@ -12,8 +12,8 @@ Licensed under 0BSD, see license.tid.
 .tpwadoc-logos > :first-child { width: 35%; }
 .tpwadoc-logos > :last-child { margin-right: 1rem; }
 
-.tpwadoc-card { display: block; text-align: center; background: var(--bg, #fff); color: #333; text-decoration: none; border-radius: 5px; padding: 1.5rem 1rem; transition: ease-in-out .3s transform; }
-.tpwadoc-card:hover { transform: scale(1.025) rotateZ(1deg); box-shadow: 0 0 8px 1px var(--bg, #fff); }
+.tpwadoc-card { display: block; text-align: center; background: var(--bg, #fff); color: #333; text-decoration: none; border-radius: 5px; padding: 1.5rem 1rem; transition: ease-in-out .3s transform; text-shadow: 0 1px color-mix(in srgb, var(--bg) 70%, #fff); }
+.tpwadoc-card:hover { transform: scale(1.02) rotateZ(0.3deg); box-shadow: 0 0 8px 1px var(--bg, #fff); }
 .tpwadoc-icon { font-size: 2.5rem; height: 2.6rem; }
 .tpwadoc-title { font-weight: bolder; height: 1.7rem; }
 
@@ -21,9 +21,13 @@ Licensed under 0BSD, see license.tid.
 .tpwadoc-row > * { flex: 1 1 0; }
 @media screen and (max-width:690px) { .tpwadoc-row { flex-direction: column; } }
 
-.tpwadoc-card-sync {--bg:#93ebff;}
-.tpwadoc-card-crypt {--bg:#fbd16c;}
+.tpwadoc-card-try {--bg:#fff4c8;}
 .tpwadoc-card-host {--bg:#ffc8e7;}
 .tpwadoc-card-upload {--bg:#e0ffdf;}
+.tpwadoc-card-sync {--bg:#93ebff;}
+.tpwadoc-card-crypt {--bg:#fbd16c;}
 .tpwadoc-card-codeberg {--bg:#b8aeff;}
 .tpwadoc-card-patreon {--bg:#ffab91;}
+
+.tpwadoc-card-try input, .tpwadoc-card-try a { padding: .5em; border-radius: 4px; background: #ffedda; color: #333; border: 1px solid #49411f; margin-top: 0.5rem; }
+.tpwadoc-card-try a:hover { background: #f0e0d0; }

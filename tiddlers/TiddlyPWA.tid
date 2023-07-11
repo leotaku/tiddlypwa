@@ -13,6 +13,30 @@ the convenience of a modern offline-friendly, encrypted, synced notes app? Now y
 TiddlyPWA turns TiddlyWiki5 into an ''offline-first'' [[Progressive Web App|https://web.dev/learn/pwa/progressive-web-apps/]]
 with ''encrypted'' local persistent storage and efficient ''synchronization'' with a server that can easily be hosted for free.
 
+!! Get started
+
+<div class="tpwadoc-card tpwadoc-card-try">
+	<div class="tpwadoc-title">Try It Out – Right Here, Right Now</div>
+	<div class="tpwadoc-subtitle">You can have multiple local on-device wikis when running from here. Pick a name and go!</div>
+	<div class="tpwadoc-goto">
+		<$edit-text tiddler="$:/temp/WikiToGoTo" tag="input" />
+		<$let wiki={{$:/temp/WikiToGoTo}}><a href=`/w/$(wiki)$/app.html`>Go!</a></$let>
+	</div>
+</div>
+
+<div class="tpwadoc-row">
+	<$link overrideClass="tpwadoc-card tpwadoc-card-host" to="ServerHosting">
+		<div class="tpwadoc-icon">📦</div>
+		<div class="tpwadoc-title">Host a Sync Server</div>
+		<div class="tpwadoc-subtitle">Set up a sync server on a free hosting platform in a couple of minutes</div>
+	</$link>
+	<$link overrideClass="tpwadoc-card tpwadoc-card-upload" to="UploadApp">
+		<div class="tpwadoc-icon">⬆️</div>
+		<div class="tpwadoc-title">Upload TiddlyPWA to Sync Server</div>
+		<div class="tpwadoc-subtitle">Initialize a wiki on the server with a fresh TiddlyPWA app install</div>
+	</$link>
+</div>
+
 !! Learn more
 
 <div class="tpwadoc-row">
@@ -25,30 +49,6 @@ with ''encrypted'' local persistent storage and efficient ''synchronization'' wi
 		<div class="tpwadoc-icon">🔐</div>
 		<div class="tpwadoc-title">Client-side Encryption</div>
 		<div class="tpwadoc-subtitle">Learn about the security model provided by TiddlyPWA</div>
-	</$link>
-</div>
-
-!! Get started
-
-<form class="tpwadoc-card tpwadoc-card-try">
-	<div class="tpwadoc-title">Try It Out – Right Here, Right Now</div>
-	<div class="tpwadoc-subtitle">You can have multiple local on-device wikis when running from here. Pick a name and go!</div>
-	<label>
-		<input type="text" value="my-first-wiki">
-		<button>Go!</button>
-	</label>
-</form>
-
-<div class="tpwadoc-row">
-	<$link overrideClass="tpwadoc-card tpwadoc-card-host" to="ServerHosting">
-		<div class="tpwadoc-icon">📦</div>
-		<div class="tpwadoc-title">Host a Sync Server</div>
-		<div class="tpwadoc-subtitle">Set up a sync server on a free hosting platform in a couple of minutes</div>
-	</$link>
-	<$link overrideClass="tpwadoc-card tpwadoc-card-upload" to="UploadApp">
-		<div class="tpwadoc-icon">⬆️</div>
-		<div class="tpwadoc-title">Upload TiddlyPWA to Sync Server</div>
-		<div class="tpwadoc-subtitle">Initialize a wiki on the server with a fresh TiddlyPWA app install</div>
 	</$link>
 </div>
 
