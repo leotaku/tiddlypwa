@@ -7,44 +7,10 @@ import { parse as argparse } from 'https://deno.land/std@0.192.0/flags/mod.ts';
 import { serveListener } from 'https://deno.land/std@0.192.0/http/server.ts';
 import * as argon from 'https://deno.land/x/argon2ian@2.0.0/src/argon2.ts';
 import * as brotli from 'https://deno.land/x/brotli@0.1.7/mod.ts';
-import * as blob from 'https://deno.land/x/kv_toolbox@0.0.2/blob.ts';
+import { SQLiteDatastore } from './server/sqlite.ts';
 
-type Tiddler = {
-	title: Uint8Array;
-	tiv: Uint8Array;
-	data: Uint8Array;
-	iv: Uint8Array;
-	mtime: Date;
-	deleted: boolean;
-};
-const tiddlerKeyPrefix = (token: string) => ['t', token];
-const tiddlerKey = (token: string, id: Uint8Array) => ['t', token, id];
+const html = String.raw; // For tools/editors
 
-type BlobMeta = {
-	refs: Set<string>;
-	size: number;
-};
-export const blobKey = (etag: Uint8Array) => ['b', etag];
-export const blobMetaKey = (etag: Uint8Array) => ['bm', etag];
-
-type AppFile = {
-	etag: Uint8Array;
-	size: number; // brotli compressed size
-	rawsize: number;
-	ctype: string;
-};
-
-type Wiki = {
-	authcode: string;
-	salt: string;
-	files?: Map<string, AppFile>;
-};
-const ALL_WIKI_PREFIX = ['w'];
-export const wikiKey = (token: string) => ['w', token.slice(0, token.length / 2), token.slice(token.length / 2)];
-const wikiKeyHalf = (halftoken: string) => ['w', halftoken];
-const tokenFromKey = (key: Deno.KvKey) => `${key[1]}${key[2]}`;
-
-const html = String.raw; // just for tools/editors
 const homePage = html`
 	<!doctype html>
 	<html lang=en>
@@ -84,6 +50,7 @@ const homePage = html`
 						<tr>
 							<td>Token</td>
 							<td>Salt</td>
+							<td>Content Size</td>
 							<td>App Files Size</td>
 							<td></td>
 						</tr>
@@ -131,7 +98,7 @@ const homePage = html`
 					const { wikis } = await resp.json();
 					const wikirows = document.getElementById('wikirows')
 					wikirows.replaceChildren();
-					for (const { token, salt, appsize } of wikis) {
+					for (const { token, salt, tidsize, appsize } of wikis) {
 						const tr = document.createElement('tr');
 						const tokenTd = document.createElement('td');
 						tokenTd.innerText = token;
@@ -139,6 +106,9 @@ const homePage = html`
 						const saltTd = document.createElement('td');
 						saltTd.innerText = salt;
 						tr.appendChild(saltTd);
+						const tidsizeTd = document.createElement('td');
+						tidsizeTd.innerText = tidsize > 0 ? formatBytes(tidsize) : '-';
+						tr.appendChild(tidsizeTd);
 						const appsizeTd = document.createElement('td');
 						if (appsize > 0) {
 							const appsizeA = document.createElement('a');
@@ -210,7 +180,7 @@ const denv = args.dotenv ? await dotenv.load() : {};
 const envvar = (name: string) => Deno.env.get(name) ?? denv[name];
 const adminpwhash = base64.decode((args.adminpwhash ?? envvar('ADMIN_PASSWORD_HASH'))?.trim());
 const adminpwsalt = base64.decode((args.adminpwsalt ?? envvar('ADMIN_PASSWORD_SALT'))?.trim());
-export const kv = await Deno.openKv(args.db ?? envvar('DB_PATH'));
+export const db = new SQLiteDatastore(args.db ?? envvar('DB_PATH'));
 const utfenc = new TextEncoder();
 
 const homePat = new URLPattern({ pathname: '/' });
@@ -221,12 +191,6 @@ const respHdrs = { 'access-control-allow-origin': '*' };
 
 function adminPasswordCorrect(atoken: string) {
 	return argon.verify(utfenc.encode(atoken), adminpwsalt, adminpwhash);
-}
-
-function parseTime(x: number) {
-	const time = new Date();
-	time.setTime(x);
-	return time;
 }
 
 function stripWeak(x: string | null) {
@@ -258,54 +222,51 @@ async function handleSync(
 	if (Math.abs(new Date(now).getTime() - new Date().getTime()) > 60000) {
 		return Response.json({ error: 'ETIMESYNC' }, { headers: respHdrs, status: 400 });
 	}
-	const wiki = await kv.get<Wiki>(wikiKey(token));
-	if (!wiki.value) {
+	const wiki = db.getWiki(token);
+	if (!wiki) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	if (wiki.value.authcode && authcode !== wiki.value.authcode) {
+	if (wiki.authcode && authcode !== wiki.authcode) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	const modsince = new Date(lastSync);
 
 	const serverChanges: Array<Record<string, string | Date | boolean | null>> = [];
 	// console.log('---');
-	for await (const { key, value } of kv.list<Tiddler>({ prefix: tiddlerKeyPrefix(token) })) {
-		const thash = key[2];
-		const { title, tiv, data, iv, mtime, deleted } = value;
-		// console.log('ServHas', base64nourl.encode(thash as Uint8Array), mtime, modsince, mtime < modsince);
-		if (mtime <= modsince) continue;
-		serverChanges.push({
-			thash: thash ? base64nourl.encode(thash as Uint8Array) : null,
-			title: title ? base64nourl.encode(title as Uint8Array) : null,
-			tiv: tiv ? base64nourl.encode(tiv as Uint8Array) : null,
-			data: data ? base64nourl.encode(data as Uint8Array) : null,
-			iv: iv ? base64nourl.encode(iv as Uint8Array) : null,
-			mtime,
-			deleted,
-		});
-	}
-	let txn = kv.atomic();
-	// console.log('ClntChg', clientChanges);
-	for (const { thash, title, tiv, data, iv, mtime, deleted } of clientChanges) {
-		txn = txn.set(tiddlerKey(token, base64nourl.decode(thash)), {
-			title: title ? base64nourl.decode(title) : null,
-			tiv: tiv ? base64nourl.decode(tiv) : null,
-			data: data ? base64nourl.decode(data) : null,
-			iv: iv ? base64nourl.decode(iv) : null,
-			mtime: new Date(mtime || now),
-			deleted: deleted || false,
-		});
-	}
-	let updateWiki = false;
-	if (!wiki.value.authcode && authcode) updateWiki = true, wiki.value.authcode = authcode;
-	if (!wiki.value.salt && salt) updateWiki = true, wiki.value.salt = salt;
-	if (updateWiki) txn = txn.set(wikiKey(token), wiki.value);
-	await txn.commit();
+	db.transaction(() => {
+		if (!wiki.authcode && authcode) db.updateWikiAuthcode(token, authcode);
+		if (!wiki.salt && salt) db.updateWikiSalt(token, salt);
+		for (const { thash, title, tiv, data, iv, mtime, deleted } of db.tiddlersChangedSince(token, modsince)) {
+			// console.log('ServHas', base64nourl.encode(thash as Uint8Array), mtime, modsince, mtime < modsince);
+			serverChanges.push({
+				thash: thash ? base64nourl.encode(thash as Uint8Array) : null,
+				title: title ? base64nourl.encode(title as Uint8Array) : null,
+				tiv: tiv ? base64nourl.encode(tiv as Uint8Array) : null,
+				data: data ? base64nourl.encode(data as Uint8Array) : null,
+				iv: iv ? base64nourl.encode(iv as Uint8Array) : null,
+				mtime,
+				deleted,
+			});
+		}
+		// console.log('ClntChg', clientChanges);
+		for (const { thash, title, tiv, data, iv, mtime, deleted } of clientChanges) {
+			db.upsertTiddler(token, {
+				thash: base64nourl.decode(thash),
+				title: title && base64nourl.decode(title),
+				tiv: tiv && base64nourl.decode(tiv),
+				data: data && base64nourl.decode(data),
+				iv: iv && base64nourl.decode(iv),
+				mtime: new Date(mtime || now),
+				deleted: deleted || false,
+			});
+		}
+	});
 
 	if (clientChanges.length > 0 && typeof browserToken === 'string') notifyMonitors(token, browserToken);
 	// assuming here that the browser would use the same Accept-Encoding as when requesting the page
-	const apphtml = wiki.value.files?.get('app.html');
-	const [_, appEtag] = apphtml ? processEtag(apphtml.etag, headers) : [null, null];
+	// const apphtml = auth.value.files?.get('app.html');
+	// const [_, appEtag] = apphtml ? processEtag(apphtml.etag, headers) : [null, null];
+	const appEtag = null;
 	return Response.json({ serverChanges, appEtag }, { headers: respHdrs });
 }
 
@@ -316,15 +277,7 @@ async function handleList({ atoken }: any) {
 	if (!adminPasswordCorrect(atoken)) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	const wikis = [];
-	for await (const { key, value } of kv.list<Wiki>({ prefix: ALL_WIKI_PREFIX })) {
-		wikis.push({
-			token: tokenFromKey(key),
-			salt: value.salt,
-			appsize: value.files ? [...value.files.values()].reduce((sum, v) => sum + v.size, 0) : 0,
-		});
-	}
-	return Response.json({ wikis }, { headers: respHdrs, status: 200 });
+	return Response.json({ wikis: db.listWikis() }, { headers: respHdrs, status: 200 });
 }
 
 async function handleCreate({ atoken }: any) {
@@ -335,31 +288,8 @@ async function handleCreate({ atoken }: any) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	const token = base64.encode(crypto.getRandomValues(new Uint8Array(32)));
-	await kv.set(wikiKey(token), {});
+	db.createWiki(token);
 	return Response.json({ token }, { headers: respHdrs, status: 201 });
-}
-
-async function garbageCollectBlobs(
-	token: string,
-	oldfiles: Map<string, AppFile> | undefined,
-	usedetags: Set<Uint8Array>,
-) {
-	if (!oldfiles) return;
-	for (const [filename, meta] of oldfiles) {
-		if (usedetags.has(meta.etag)) continue;
-		const key = blobMetaKey(meta.etag);
-		const prevblobmeta = await kv.get<BlobMeta>(key);
-		const blobmeta = prevblobmeta.value;
-		if (!blobmeta) continue;
-		blobmeta.refs.delete(token);
-		const txn = kv.atomic().check({ key, versionstamp: prevblobmeta.versionstamp });
-		if (blobmeta.refs.size === 0) {
-			await blob.remove(kv, blobKey(meta.etag));
-			await txn.delete(key).commit();
-		} else {
-			await txn.set(key, blobmeta).commit();
-		}
-	}
 }
 
 async function handleDelete({ atoken, token }: any) {
@@ -369,15 +299,10 @@ async function handleDelete({ atoken, token }: any) {
 	if (!adminPasswordCorrect(atoken)) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	const wiki = await kv.get<Wiki>(wikiKey(token));
-	if (!wiki.value) {
+	if (!db.getWiki(token)) {
 		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
 	}
-	await kv.delete(wikiKey(token));
-	for await (const { key } of kv.list<Tiddler>({ prefix: tiddlerKeyPrefix(token) })) {
-		await kv.delete(key);
-	}
-	await garbageCollectBlobs(token, wiki.value.files, new Set());
+	db.deleteWiki(token);
 	return Response.json({}, { headers: respHdrs, status: 200 });
 }
 
@@ -388,14 +313,10 @@ async function handleReauth({ atoken, token }: any) {
 	if (!adminPasswordCorrect(atoken)) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	const wiki = await kv.get<Wiki>(wikiKey(token));
-	if (!wiki.value) {
+	if (!db.getWiki(token)) {
 		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
 	}
-	await kv.set(wikiKey(token), {
-		...wiki.value,
-		authcode: undefined,
-	});
+	db.updateWikiAuthcode(token, undefined);
 	return Response.json({}, { headers: respHdrs, status: 200 });
 }
 
@@ -403,48 +324,35 @@ async function handleUploadApp({ token, authcode, browserToken, files }: any) {
 	if (typeof token !== 'string' || typeof files !== 'object') {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	const wiki = await kv.get<Wiki>(wikiKey(token));
-	if (!wiki.value) {
+	const wiki = db.getWiki(token);
+	if (!wiki) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	if (wiki.value.authcode && authcode !== wiki.value.authcode) {
+	if (wiki.authcode && authcode !== wiki.authcode) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
-	const filemap = new Map();
-	const usedetags = new Set<Uint8Array>();
-	let txn = kv.atomic().check({ key: wikiKey(token), versionstamp: wiki.versionstamp });
-	for (const [filename, value] of Object.entries(files)) {
-		const { body, ctype } = value as any;
-		const utf = utfenc.encode(body);
-		const etag = new Uint8Array(await crypto.subtle.digest('SHA-1', utf));
-		const prevblobmeta = await kv.get<BlobMeta>(blobMetaKey(etag));
-		let blobmeta;
-		if (prevblobmeta.value) {
-			blobmeta = prevblobmeta.value;
-			txn = txn.check({ key: blobMetaKey(etag), versionstamp: prevblobmeta.versionstamp });
-		} else {
-			const brot = brotli.compress(utf, 4096, 8);
-			await blob.set(kv, blobKey(etag), brot);
-			blobmeta = { refs: new Set(), size: brot.length };
+	const uploads = await Promise.all(
+		Object.entries(files).map(async ([filename, value]) => {
+			const { body, ctype } = value as any;
+			const utf = utfenc.encode(body);
+			const etag = new Uint8Array(await crypto.subtle.digest('SHA-1', utf));
+			return { filename, etag, utf, ctype };
+		}),
+	);
+	db.transaction(() => {
+		for (const { filename, etag, utf, ctype } of uploads) {
+			if (!db.fileExists(etag)) {
+				db.storeFile({
+					etag,
+					rawsize: utf.length,
+					ctype,
+					body: brotli.compress(utf, 4096, 8),
+				});
+			}
+			db.associateFile(token, etag, filename);
 		}
-		if (!blobmeta.refs.has(token)) {
-			blobmeta.refs.add(token);
-			txn = txn.set(blobMetaKey(etag), blobmeta);
-		}
-		filemap.set(filename, {
-			etag,
-			size: blobmeta.size,
-			rawsize: utf.length,
-			ctype,
-		});
-		usedetags.add(etag);
-	}
-	await txn.set(wikiKey(token), {
-		...wiki.value,
-		files: filemap,
-	}).commit();
+	});
 	if (typeof browserToken === 'string') notifyMonitors(token, browserToken);
-	await garbageCollectBlobs(token, wiki.value.files, usedetags);
 	return Response.json({ urlprefix: token.slice(0, token.length / 2) + '/' }, { headers: respHdrs, status: 200 });
 }
 
@@ -454,8 +362,7 @@ async function handleMonitor(query: URLSearchParams) {
 	if (!token || !browserToken) {
 		return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 	}
-	const wiki = await kv.get<Wiki>(wikiKey(token));
-	if (!wiki.value) {
+	if (!db.getWiki(token)) {
 		return Response.json({ error: 'EAUTH' }, { headers: respHdrs, status: 401 });
 	}
 	let pushChan: BroadcastChannel;
@@ -502,8 +409,8 @@ async function handleAppFile(req: Request) {
 	}
 	const { halftoken, filename } = match.pathname.groups;
 	if (!halftoken || !filename) return null;
-	const wiki = await kv.list<Wiki>({ prefix: wikiKeyHalf(halftoken) }).next();
-	if (!wiki.value || !wiki.value.value) {
+	const wiki = db.getWikiByPrefix(halftoken);
+	if (!wiki) {
 		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
 	}
 	if (req.method === 'OPTIONS') {
@@ -512,18 +419,18 @@ async function handleAppFile(req: Request) {
 	if (filename === 'bootstrap.json') {
 		return Response.json({
 			endpoint: '/tid.dly',
-			state: wiki.value.value.salt ? 'existing' : 'fresh',
-			salt: wiki.value.value.salt,
+			state: wiki.salt ? 'existing' : 'fresh',
+			salt: wiki.salt,
 		}, { headers: respHdrs });
 	}
-	const meta = wiki.value.value.files?.get(filename);
-	if (!meta) {
+	const file = db.getWikiFile(halftoken, filename);
+	if (!file) {
 		return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
 	}
-	const [supportsBrotli, etagstr] = processEtag(meta.etag, req.headers);
+	const [supportsBrotli, etagstr] = processEtag(file.etag, req.headers);
 	// if we decompress and Deno recompresses to something else (gzip) it'll mark the ETag as a weak validator
 	const headers = new Headers({
-		'content-type': meta.ctype,
+		'content-type': file.ctype,
 		'vary': 'Accept-Encoding',
 		'cache-control': 'no-cache',
 		'etag': etagstr,
@@ -534,16 +441,14 @@ async function handleAppFile(req: Request) {
 	let body;
 	if (supportsBrotli) {
 		headers.set('content-encoding', 'br');
-		headers.set('content-length', meta.size.toString());
+		headers.set('content-length', file.body.length.toString());
 		if (req.method !== 'HEAD') {
-			body = blob.get(kv, blobKey(meta.etag), { stream: true });
+			body = file.body;
 		}
 	} else {
-		headers.set('content-length', meta.rawsize.toString());
+		headers.set('content-length', file.rawsize.toString());
 		if (req.method !== 'HEAD') {
-			const compressed = await blob.get(kv, blobKey(meta.etag), { stream: false });
-			if (!compressed) return Response.json({ error: 'EEXIST' }, { headers: respHdrs, status: 404 });
-			body = brotli.decompress(compressed);
+			body = brotli.decompress(file.body);
 		}
 	}
 	return new Response(body, { headers });
