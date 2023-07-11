@@ -95,6 +95,63 @@ Deno.test('basic syncing works', async () => {
 	await deleteWiki(tok);
 });
 
+Deno.test('syncing a ton of tiddlers works', async () => {
+	const tok = await createWiki();
+	const s1date = new Date();
+	assertEquals(
+		await sync(
+			tok,
+			'test',
+			s1date,
+			new Date(0),
+			[...Array(20).keys()].map((_, i) => ({ thash: btoa(i.toString()), data: 'T3dp' })),
+		),
+		{ appEtag: null, serverChanges: [] },
+	);
+	assertEquals(await sync(tok, 'test', new Date(), new Date(420), []), {
+		appEtag: null,
+		serverChanges: [...Array(20).keys()].map((_, i) => (
+			{
+				thash: btoa(i.toString()),
+				title: null,
+				tiv: null,
+				data: 'T3dp',
+				iv: null,
+				mtime: s1date.toISOString(),
+				deleted: false,
+			}
+		)),
+	});
+	await deleteWiki(tok);
+});
+
+Deno.test('storing large data works', async () => {
+	const tok = await createWiki();
+	const s1date = new Date();
+	const bigdata = Array(5592407).join('A') + '==';
+	assertEquals(
+		await sync(tok, 'test', s1date, new Date(0), [
+			{ thash: 'T3dP', data: bigdata },
+		]),
+		{ appEtag: null, serverChanges: [] },
+	);
+	assertEquals(await sync(tok, 'test', new Date(), new Date(420), []), {
+		appEtag: null,
+		serverChanges: [
+			{
+				thash: 'T3dP',
+				title: null,
+				tiv: null,
+				data: bigdata,
+				iv: null,
+				mtime: s1date.toISOString(),
+				deleted: false,
+			},
+		],
+	});
+	await deleteWiki(tok);
+});
+
 // as we have a complex refcounting system for blobs, ensure they don't ever get left over
 Deno.test('app file blob garbage collected when changing content or deleting wiki', async () => {
 	const tok1 = await createWiki();
