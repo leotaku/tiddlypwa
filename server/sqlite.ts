@@ -41,7 +41,7 @@ export class SQLiteDatastore extends DB {
 					name TEXT NOT NULL,
 					FOREIGN KEY(token) REFERENCES wikis(token) ON DELETE CASCADE,
 					FOREIGN KEY(etag) REFERENCES files(etag),
-					PRIMARY KEY (token, etag)
+					PRIMARY KEY (token, etag, name)
 				) STRICT;
 				CREATE TRIGGER files_cleanup AFTER DELETE ON wikifiles BEGIN
 					DELETE FROM files WHERE etag = OLD.etag AND (SELECT COUNT(*) FROM wikifiles WHERE etag = OLD.etag) = 0;
@@ -118,7 +118,13 @@ export class SQLiteDatastore extends DB {
 	}
 
 	associateFile(token: string, etag: Uint8Array, name: string) {
-		this.query(sql`INSERT INTO wikifiles (token, etag, name) VALUES (:token, :etag, :name)`, { token, etag, name });
+		this.query(
+			sql`
+				INSERT INTO wikifiles (token, etag, name) VALUES (:token, :etag, :name)
+				ON CONFLICT (token, etag, name) DO NOTHING
+			`,
+			{ token, etag, name },
+		);
 	}
 
 	#wikiFileQuery = this.prepareQuery<[], File>(sql`
