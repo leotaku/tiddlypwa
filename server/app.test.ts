@@ -1,8 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
-// deno test --unstable --allow-env --allow-read=.
-import 'https://deno.land/std@0.192.0/dotenv/load.ts';
 import { assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
-import * as app from './app.ts';
+import { SQLiteDatastore } from './sqlite.ts';
+import { TiddlyPWASyncApp } from './app.ts';
+
+const app = new TiddlyPWASyncApp(
+	new SQLiteDatastore(),
+	'q6kQ8SNKeaVVQDbhb7TgyqdTp8KAO31rU-6AGT1xG0o',
+	'ZnPOVo2E_oWm71aQ-eOX9U3-gIE2hR6nfksboNcLNPQ',
+);
 
 const api = (data: any) =>
 	app.handle(
