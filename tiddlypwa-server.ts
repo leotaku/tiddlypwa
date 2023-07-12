@@ -264,9 +264,8 @@ async function handleSync(
 
 	if (clientChanges.length > 0 && typeof browserToken === 'string') notifyMonitors(token, browserToken);
 	// assuming here that the browser would use the same Accept-Encoding as when requesting the page
-	// const apphtml = auth.value.files?.get('app.html');
-	// const [_, appEtag] = apphtml ? processEtag(apphtml.etag, headers) : [null, null];
-	const appEtag = null;
+	const apphtml = db.getWikiFile(token, 'app.html');
+	const [_, appEtag] = apphtml ? processEtag(apphtml.etag, headers) : [null, null];
 	return Response.json({ serverChanges, appEtag }, { headers: respHdrs });
 }
 
