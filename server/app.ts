@@ -5,7 +5,7 @@ import * as base64nourl from 'https://deno.land/std@0.192.0/encoding/base64.ts';
 import * as argon from 'https://deno.land/x/argon2ian@2.0.0/src/argon2.ts';
 import * as brotli from 'https://deno.land/x/brotli@0.1.7/mod.ts';
 import { homePage } from './pages.ts';
-import { SQLiteDatastore } from './sqlite.ts';
+import { Datastore } from './data.d.ts';
 
 const utfenc = new TextEncoder();
 
@@ -31,11 +31,11 @@ function notifyMonitors(token: string, browserToken: string) {
 }
 
 export class TiddlyPWASyncApp {
-	db: SQLiteDatastore;
+	db: Datastore;
 	adminpwsalt: Uint8Array;
 	adminpwhash: Uint8Array;
 
-	constructor(db: SQLiteDatastore, adminpwsalt: string, adminpwhash: string) {
+	constructor(db: Datastore, adminpwsalt: string, adminpwhash: string) {
 		this.db = db;
 		this.adminpwsalt = base64.decode(adminpwsalt);
 		this.adminpwhash = base64.decode(adminpwhash);

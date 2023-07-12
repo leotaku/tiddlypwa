@@ -1,6 +1,6 @@
 /// <reference lib="deno.window" />
 
-import { File, Tiddler, Wiki } from './data.d.ts';
+import { Datastore, File, Tiddler, Wiki } from './data.d.ts';
 import { DB } from 'https://deno.land/x/sqlite@v3.7.2/mod.ts';
 
 const sql = String.raw; // For tools/editors
@@ -11,7 +11,7 @@ function parseTime(x: number) {
 	return time;
 }
 
-export class SQLiteDatastore extends DB {
+export class SQLiteDatastore extends DB implements Datastore {
 	// Unlike the constructor, this runs before other fields (prepared queries)
 	#_ = (() => {
 		this.execute('PRAGMA foreign_keys = ON;');
@@ -66,7 +66,7 @@ export class SQLiteDatastore extends DB {
 	#wikiQuery = this.prepareQuery<[], Wiki>(
 		sql`SELECT token, authcode, salt, note FROM wikis WHERE token = :token`,
 	);
-	getWiki(token: string): Wiki | undefined {
+	getWiki(token: string) {
 		const rows = this.#wikiQuery.allEntries({ token });
 		if (rows.length < 1) return;
 		return rows[0];
@@ -75,7 +75,7 @@ export class SQLiteDatastore extends DB {
 	#wikiQueryPrefix = this.prepareQuery<[], Wiki>(
 		sql`SELECT token, authcode, salt, note FROM wikis WHERE token LIKE :halftoken || '%'`,
 	);
-	getWikiByPrefix(halftoken: string): Wiki | undefined {
+	getWikiByPrefix(halftoken: string) {
 		const rows = this.#wikiQueryPrefix.allEntries({ halftoken });
 		if (rows.length < 1) return;
 		return rows[0];
@@ -109,7 +109,7 @@ export class SQLiteDatastore extends DB {
 		this.query(sql`DELETE FROM wikis WHERE token = :token`, { token });
 	}
 
-	fileExists(etag: Uint8Array): boolean {
+	fileExists(etag: Uint8Array) {
 		return this.query<[boolean]>(sql`SELECT count(*) FROM files WHERE etag = :etag`, { etag })[0][0];
 	}
 
@@ -132,7 +132,7 @@ export class SQLiteDatastore extends DB {
 		FROM files, wikifiles
 		WHERE files.etag = wikifiles.etag AND wikifiles.name = :name AND wikifiles.token LIKE :halftoken || '%'
 	`);
-	getWikiFile(halftoken: string, name: string): File | undefined {
+	getWikiFile(halftoken: string, name: string) {
 		const rows = this.#wikiFileQuery.allEntries({ halftoken, name });
 		if (rows.length < 1) return;
 		return rows[0];
@@ -153,7 +153,7 @@ export class SQLiteDatastore extends DB {
 		SELECT thash, title, tiv, data, iv, mtime, deleted
 		FROM tiddlers WHERE mtime > :modsince AND token = :token
 	`);
-	tiddlersChangedSince(token: string, since: Date): Array<Tiddler> {
+	tiddlersChangedSince(token: string, since: Date) {
 		const results = [];
 		for (const tiddler of this.#changedQuery.iterEntries({ modsince: since.getTime(), token })) {
 			results.push({ ...tiddler, mtime: parseTime(tiddler.mtime), deleted: !!tiddler.deleted });

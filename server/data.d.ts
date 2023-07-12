@@ -23,3 +23,20 @@ export type Tiddler = {
 	mtime: Date;
 	deleted: boolean;
 };
+
+export interface Datastore {
+	transaction(f: () => void): void;
+	getWiki(token: string): Wiki | undefined;
+	getWikiByPrefix(halftoken: string): Wiki | undefined;
+	listWikis(): Array<Wiki>;
+	createWiki(token: string): void;
+	updateWikiAuthcode(token: string, authcode?: string): void;
+	updateWikiSalt(token: string, salt: string): void;
+	deleteWiki(token: string): void;
+	fileExists(etag: Uint8Array): boolean;
+	storeFile(file: File): void;
+	associateFile(token: string, etag: Uint8Array, name: string): void;
+	getWikiFile(halftoken: string, name: string): File | undefined;
+	tiddlersChangedSince(token: string, since: Date): Array<Tiddler>;
+	upsertTiddler(token: string, tiddler: Tiddler): void;
+}
