@@ -2,7 +2,7 @@
 // deno test --unstable --allow-env --allow-read=.
 import 'https://deno.land/std@0.192.0/dotenv/load.ts';
 import { assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
-import * as app from './tiddlypwa-server.ts';
+import * as app from './app.ts';
 
 const api = (data: any) =>
 	app.handle(
