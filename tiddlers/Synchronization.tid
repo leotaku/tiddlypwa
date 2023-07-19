@@ -1,0 +1,37 @@
+title: Synchronization
+tags: [[TiddlyPWA Docs]]
+
+TiddlyPWA uses IndexedDB to store [[encrypted|Encryption]] tiddlers in your web browser, and supports syncing them with a
+server you can easily [[self-host|ServerHost]] for free. (Or with more than one server if you want extreme reliability.)
+
+Real-time updates are used to trigger synchronization to happen when you have TiddlyPWA open on multiple devices
+and you make changes on one of them.
+
+A sync server can also host the app wiki HTML, which is the suggested setup. While not the best in terms of security paranoia
+(see the [[Encryption]] article), it makes plugin/theme installation work seamlessly: the wiki just saves itself to the server
+with new plugins/themes included.
+
+The official included sync server implementation is written in TypeScript for [[Deno|https://deno.com/]], and uses SQLite3 for storage.
+
+!! What Even Is A Wiki
+
+As a sync server administrator, you get access to an admin interface with the ability to create and delete wikis on the server.
+When you create one, you will see that it is identified by a ''token''. A sync token is something in between
+a username and a password. It is a server-specific identifier for a particular wiki.
+A newly created "wiki" on the server is just a blank storage slot.
+
+When adding the server's URL and the particular sync token to a running TiddlyPWA wiki for the first time, the first sync will happen,
+associating that storage slot "with that particular wiki", which really means the following things getting stored:
+
+* the "salt" value, which is a large random number used to strengthen the password security
+* the "authcode" value, which is like a digital signature used for checking that the client-side password matches (to prevent accidental mix-ups between wikis)
+
+The "salt" is, in a way, the real "identity" of a wiki.
+
+When loading TiddlyPWA from the sync server, the "salt" will be passed to the browser, so that the user experience is smooth: all you need to know
+is the token and the password, just enter them correctly and that local wiki is initialized correctly and the first sync pulls down
+all the tiddlers from the server and they are readable because the encryption key matches.
+
+When *not* loading TiddlyPWA from the sync server, i.e. opening the same wiki in a second device/browser using TiddlyPWA hosted outside of the sync server,
+you must copy the salt value from the first device/browser (or the sync admin interface) and paste it when ''initializing'' the local wiki (and, of course,
+use the exact same password too) — otherwise the server will refuse the sync because the encryption key would not match.
