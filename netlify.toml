@@ -1,0 +1,18 @@
+[build]
+publish = "output"
+command = """
+  mkdir notebook; curl -L https://github.com/paul-rouse/Notebook/archive/8ef0f172a110e4b1c126e51c1e5a82cbb487e7e6.tar.gz | tar -xvzf - -C notebook --strip-components=1 &&
+  TIDDLYWIKI_THEME_PATH=notebook/themes TIDDLYWIKI_PLUGIN_PATH=notebook/plugins npx tiddlywiki@5.3.0 --build
+"""
+
+[[headers]]
+for = "/*"
+[headers.values]
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"
+referrer-policy = "no-referrer-when-downgrade"
+
+[[redirects]]
+from = "/w/:name/:file"
+to = "/app/:file"
+status = 200
