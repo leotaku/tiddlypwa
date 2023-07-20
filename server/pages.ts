@@ -49,6 +49,8 @@ export const homePage = html`
 				</table>
 				<button id=refresh>Refresh</button>
 				<button id=create>Create new wiki</button>
+				<h2>Endpoint URL</h2>
+				<p>This is what should be pasted into the TiddlyPWA sync settings or the app uploader:<br><code id=endpoint></code></p>
 			</div>
 			<footer>
 				<a href=https://tiddly.packett.cool/>TiddlyPWA</a> sync server ✦ software by <a href=https://val.packett.cool/>Val Packett</a>
@@ -134,6 +136,7 @@ export const homePage = html`
 						e.preventDefault();
 						loginForm.querySelector('fieldset').disabled = true;
 						refreshTokens().then((suc) => {
+							document.getElementById('endpoint').textContent = new URL('tid.dly', document.location).toString();
 							document.getElementById('loggedin').hidden = !suc;
 							loginForm.hidden = suc;
 							loginForm.querySelector('fieldset').disabled = suc;
