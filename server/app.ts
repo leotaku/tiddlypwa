@@ -154,9 +154,12 @@ export class TiddlyPWASyncApp {
 	}
 
 	@adminAuth
-	handleCreate(_: unknown) {
+	handleCreate({ note }: Record<string, unknown>) {
+		if (note !== undefined && typeof note !== 'string') {
+			return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
+		}
 		const token = base64.encode(crypto.getRandomValues(new Uint8Array(32)));
-		this.db.createWiki(token);
+		this.db.createWiki(token, note);
 		return Response.json({ token }, { headers: respHdrs, status: 201 });
 	}
 

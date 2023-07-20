@@ -29,7 +29,7 @@ export interface Datastore {
 	getWiki(token: string): Wiki | undefined;
 	getWikiByPrefix(halftoken: string): Wiki | undefined;
 	listWikis(): Array<Wiki>;
-	createWiki(token: string): void;
+	createWiki(token: string, note?: string): void;
 	updateWikiAuthcode(token: string, authcode?: string): void;
 	updateWikiSalt(token: string, salt: string): void;
 	deleteWiki(token: string): void;

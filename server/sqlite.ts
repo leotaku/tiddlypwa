@@ -82,7 +82,9 @@ export class SQLiteDatastore extends DB implements Datastore {
 	}
 
 	listWikis() {
-		return this.queryEntries<{ token: string; authcode?: string; salt?: string; tidsize: number; appsize: number }>(sql`
+		return this.queryEntries<
+			{ token: string; authcode?: string; salt?: string; note?: string; tidsize: number; appsize: number }
+		>(sql`
 			SELECT token, authcode, salt, note, (
 				SELECT sum(length(thash) + length(title) + length(tiv) + length(data) + length(iv))
 				FROM tiddlers
@@ -93,8 +95,8 @@ export class SQLiteDatastore extends DB implements Datastore {
 		`);
 	}
 
-	createWiki(token: string) {
-		this.query(sql`INSERT INTO wikis (token) VALUES (:token)`, { token });
+	createWiki(token: string, note?: string) {
+		this.query(sql`INSERT INTO wikis (token, note) VALUES (:token, :note)`, { token, note });
 	}
 
 	updateWikiAuthcode(token: string, authcode?: string) {

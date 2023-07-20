@@ -9,7 +9,7 @@ export const homePage = html`
 			<style>
 				* { box-sizing: border-box; }
 				html { background: #252525; color: #fbfbfb; -webkit-text-size-adjust: none; text-size-adjust: none; accent-color: limegreen; }
-				body { margin: 2rem auto; min-width: 300px; max-width: 99ch; line-height: 1.5; word-wrap: break-word; font-family: system-ui, sans-serif; }
+				body { margin: 2rem auto; min-width: 300px; max-width: 120ch; line-height: 1.5; word-wrap: break-word; font-family: system-ui, sans-serif; }
 				a { color: limegreen; }
 				a:hover { color: lime; }
 				h1 { font: 1.25rem monospace; text-align: center; color: limegreen; margin-bottom: 2rem; }
@@ -20,7 +20,7 @@ export const homePage = html`
 				table { border-collapse: collapse; margin: 1rem 0; }
 				td { padding: 0.25rem 0.6rem; }
 				tr:nth-child(even) { background: rgba(255,255,255,.08); }
-				#wikirows td:first-of-type, #wikirows td:nth-of-type(2) { font-family: monospace; }
+				#wikirows td:nth-of-type(2), #wikirows td:nth-of-type(3) { font-family: monospace; }
 			</style>
 		</head>
 		<body>
@@ -37,6 +37,7 @@ export const homePage = html`
 				<table>
 					<thead>
 						<tr>
+							<td>Note</td>
 							<td>Token</td>
 							<td>Salt</td>
 							<td>Content Size</td>
@@ -89,8 +90,11 @@ export const homePage = html`
 					const { wikis } = await resp.json();
 					const wikirows = document.getElementById('wikirows')
 					wikirows.replaceChildren();
-					for (const { token, salt, tidsize, appsize } of wikis) {
+					for (const { token, note, salt, tidsize, appsize } of wikis) {
 						const tr = document.createElement('tr');
+						const noteTd = document.createElement('td');
+						noteTd.innerText = note;
+						tr.appendChild(noteTd);
 						const tokenTd = document.createElement('td');
 						tokenTd.innerText = token;
 						tr.appendChild(tokenTd);
@@ -159,7 +163,7 @@ export const homePage = html`
 						});
 					};
 					createBtn.onclick = () => {
-						serverReq({ op: 'create' }).then(() => refreshBtn.click());
+						serverReq({ op: 'create', note: prompt('Leave a note about this wiki if you want?') || '' }).then(() => refreshBtn.click());
 					}
 				});
 			</script>
