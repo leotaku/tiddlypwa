@@ -1,0 +1,29 @@
+title: ServerHosting/DIY
+tags: [[TiddlyPWA Docs]]
+
+It is very easy to run the official TiddlyPWA sync server implementation on Just Some Computer.
+All you need is [[Deno|https://deno.com/]]. There are no moving parts like external database servers to run.
+
+* get the Deno Runtime using [[the official builds|https://deno.com/manual/getting_started/installation]] or your OS's package manager
+* decide on an admin password and hash it using one of the following options (you'll get two environment variables):
+** on the console with `deno run https://codeberg.org/valpackett/tiddlypwa/raw/branch/release/server/hash-admin-password.ts`
+** [[right here in the browser|HashAdminPassword]]
+* decide on a location for the SQLite database file (set it using the `DB_PATH` environment variable and pass the containing directory as both `--allow-read` and `--allow-write` permissions)
+* run the script, assembling the variables and options together like the example below
+
+```
+ADMIN_PASSWORD_HASH=Zn…PQ \
+	ADMIN_PASSWORD_SALT=q6…0o \
+	DB_PATH=/var/db/tiddly/pwa.db \
+	deno run --unstable --allow-env \
+	--allow-read=/var/db/tiddly --allow-write=/var/db/tiddly \
+	--allow-net=:8000 \
+	https://codeberg.org/valpackett/tiddlypwa/raw/branch/release/server/run.ts
+```
+
+You can customize the host and port to listen on with the `--host` and `--port` flags after the script path (be sure to adjust `--allow-net` accordingly),
+or use a unix domain socket passing the path as `--socket` (you'll need to both `--allow-read` and `--allow-write` that path).
+
+You can pass the `--dotenv` flag to make the app read variables from a `.env` file (which is mostly used in development with the included file that contains a hash of the `test` password.)
+
+You really need to have TLS working, so run this behind a reverse proxy like Nginx or Caddy.

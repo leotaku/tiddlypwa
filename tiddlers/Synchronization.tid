@@ -2,7 +2,7 @@ title: Synchronization
 tags: [[TiddlyPWA Docs]]
 
 TiddlyPWA uses IndexedDB to store [[encrypted|Encryption]] tiddlers in your web browser, and supports syncing them with a
-server you can easily [[self-host|ServerHost]] for free. (Or with more than one server if you want extreme reliability.)
+server you can easily [[self-host|ServerHosting]] for free. (Or with more than one server if you want extreme reliability.)
 
 Real-time updates are used to trigger synchronization to happen when you have TiddlyPWA open on multiple devices
 and you make changes on one of them.

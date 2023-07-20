@@ -25,9 +25,18 @@ Formatted with `deno fmt`.
 		render(parent, nextSibling) {
 			this.computeAttributes();
 			if (parent) this.#parent = parent;
-			const txt = this.document.createTextNode('…');
-			this.#parent.insertBefore(txt, nextSibling);
-			this.domNodes.push(txt);
+			const glitch = this.hasAttribute('glitch');
+			const node = this.document.createElement(glitch ? 'a' : 'pre');
+			node.hidden = true;
+			this.#parent.insertBefore(node, nextSibling);
+			this.domNodes.push(node);
+			if (glitch) {
+				const img = this.document.createElement('img');
+				img.alt = 'Remix on Glitch!';
+				img.src = 'https://cdn.glitch.com/2703baf2-b643-4da7-ab91-7ee2a2d00b5b%2Fremix-button-v2.svg';
+				node.appendChild(img);
+				node.target = '_blank';
+			}
 			if (!worker) {
 				const AW = require('$:/plugins/valpackett/tiddlypwa/argon2ian.js').ArgonWorker;
 				worker = new AW();
@@ -36,10 +45,16 @@ Formatted with `deno fmt`.
 			if (password.length > 0) {
 				const salt = crypto.getRandomValues(new Uint8Array(32));
 				worker.ready.then(() => worker.hash(new TextEncoder().encode(password), salt)).then((hash) => {
-					txt.textContent = 'ADMIN_PASSWORD_HASH=' + b64uenc(hash) + '\n' +
-						'ADMIN_PASSWORD_SALT=' + b64uenc(salt);
+					const ph = 'ADMIN_PASSWORD_HASH=' + b64uenc(hash);
+					const ps = 'ADMIN_PASSWORD_SALT=' + b64uenc(salt);
+					if (glitch) {
+						node.href = `https://glitch.com/edit/#!/remix/tiddlypwa-sync-server?${ph}&${ps}`;
+					} else {
+						node.textContent = ph + '\n' + ps;
+					}
+					node.hidden = false;
 				});
-			}
+			} else node.hidden = true;
 		}
 		refresh(_chg) {
 			if (this.computeAttributes().password) {
