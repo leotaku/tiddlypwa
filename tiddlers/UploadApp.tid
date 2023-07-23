@@ -1,6 +1,14 @@
 title: UploadApp
 tags: [[TiddlyPWA Docs]]
 
+Enter the [[Synchronization]] server endpoint URL and the token of the wiki storage slot you want to upload a fresh app wiki into:
+
 {{$:/plugins/valpackett/tiddlypwa/upload-app-form}}
 
 {{$:/status/TiddlyPWAUploadResult}}
+
+The fresh app wiki will contain TiddlyWiki core {{$:/core!!version}} and TiddlyPWA {{$:/plugins/valpackett/tiddlypwa!!version}}.
+
+Note: when uploading into a slot that already has the app wiki HTML uploaded (i.e. for recovering from a broken update) you'll need to use the "Clear Auth" button in the admin interface first.
+
+The correct way to update a wiki that works fine is to [[UpdateInPlace]]!

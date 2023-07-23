@@ -11,7 +11,13 @@ A sync server can also host the app wiki HTML, which is the suggested setup. Whi
 (see the [[Encryption]] article), it makes plugin/theme installation work seamlessly: the wiki just saves itself to the server
 with new plugins/themes included.
 
-The official included sync server implementation is written in TypeScript for [[Deno|https://deno.com/]], and uses SQLite3 for storage.
+To sum up, this is the key to understanding TiddlyPWA:
+
+* there's always ''local storage in your browser'' and you're looking at tiddlers stored there
+** that storage is ''unique per URL'' (that's why the home page of the documentation offers a name field for having multiple wikis: we serve the same app from a URL that includes the name you pick)
+* the local storage can be ''synchronized'' with a server
+* the server can serve the wiki app too, which enables ''easy configuration'' for the synchronization as well as ''easy plugin/theme installation''
+* multiple of those local storages in multiple browsers can be synchronized together as long as they're all initialized to be "the same wiki", see below:
 
 !! What Even Is A Wiki
 
@@ -35,3 +41,20 @@ all the tiddlers from the server and they are readable because the encryption ke
 When *not* loading TiddlyPWA from the sync server, i.e. opening the same wiki in a second device/browser using TiddlyPWA hosted outside of the sync server,
 you must copy the salt value from the first device/browser (or the sync admin interface) and paste it when ''initializing'' the local wiki (and, of course,
 use the exact same password too) — otherwise the server will refuse the sync because the encryption key would not match.
+
+!! What's In a Sync
+
+The sync protocol uses wall clock time for determining the order of updates.
+To prevent problems, the server does check that your on-device time isn't too far away from the server's time.
+
+A sync happens in one request:
+
+* the client sends all tiddlers that have changed ''since the time of the last sync with the server''
+* the server replies with all tiddlers that have changed since that same time (as sent by the client)
+* the server applies the client changes, ''without'' checking that they're actually newer than the timestamp (there is a special emergency button on the client that would intentionally send everything)
+* the client applies the server changes, checking for each tiddler that it's actually newer than what the client already has (''for now'' in case a tidder has changed both on the server and the client, the newest version wins and the older one is thrown away; there are plans to add interactive conflict resolution)
+* the server notifies connected clients (except for the one requesting the sync) with a real-time update
+
+Currently, the request and response are not streaming and have to be transferred entirely to be processed.
+If you try to abuse the sync mechanism by building a photo gallery out of image tiddlers, you're probably gonna have a bad time.
+Please be reasonable with it :)
