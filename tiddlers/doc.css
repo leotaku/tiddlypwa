@@ -14,6 +14,7 @@ Licensed under 0BSD, see license.tid.
 
 .tpwadoc-card { display: block; text-align: center; background: var(--bg, #fff); color: #333; text-decoration: none; border-radius: 5px; padding: 1.5rem 1rem; transition: ease-in-out .3s transform; text-shadow: 0 1px color-mix(in srgb, var(--bg) 70%, #fff); }
 .tpwadoc-card:hover { transform: scale(1.02) rotateZ(0.3deg); box-shadow: 0 0 8px 1px var(--bg, #fff); }
+@media (prefers-reduced-motion) { .tpwadoc-card:hover { transform: none; } }
 .tpwadoc-icon { font-size: 2.5rem; height: 2.6rem; }
 .tpwadoc-title { font-weight: bolder; height: 1.7rem; }
 
