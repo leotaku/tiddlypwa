@@ -18,10 +18,7 @@ with ''encrypted'' local persistent storage and efficient ''synchronization'' wi
 <div class="tpwadoc-card tpwadoc-card-try">
 	<div class="tpwadoc-title">Try It Out – Right Here, Right Now</div>
 	<div class="tpwadoc-subtitle">You can have multiple local on-device wikis when running from here. Pick a name and go!</div>
-	<div class="tpwadoc-goto">
-		<$edit-text tiddler="$:/temp/WikiToGoTo" tag="input" />
-		<$let wiki={{$:/temp/WikiToGoTo}}><a href=`/w/$(wiki)$/app.html`>Go!</a></$let>
-	</div>
+	<$goto-form/>
 </div>
 
 <div class="tpwadoc-row">
