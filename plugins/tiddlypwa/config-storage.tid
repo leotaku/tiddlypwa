@@ -14,6 +14,9 @@ Persistent storage support has been ''enabled''.
 Persistent storage support has not yet been enabled.
 It's a good idea to <$button message="tiddlypwa-enable-persistence">enable it</$button> 
 to make sure the local wiki data would never get automatically purged.
+Warning: in some browsers (such as Chromium-based ones) there is no permission prompt and
+this is managed automatically, so the button by itself won't do anything.
+Bookmarking the page or installing it as an app should help.
 </$reveal>
 
 <$reveal type="nomatch" state="$:/status/TiddlyPWAStorageQuota" text="unavail">
