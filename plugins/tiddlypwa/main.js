@@ -84,6 +84,7 @@ Formatted with `deno fmt`.
 	}
 
 	async function encodeTiddler(tiddler, isBin) {
+		if (!tiddler.fields.text) isBin = false;
 		const padTo = 256;
 		let flags = 0, gzchunks, gzlen = 0, binstr;
 		const jsonstr = JSON.stringify(
