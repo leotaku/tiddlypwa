@@ -607,7 +607,7 @@ Formatted with `deno fmt`.
 				const closeModal = () => {
 					try {
 						document.body.removeChild(wrapper);
-					} finally {
+					} catch (_e) {
 						/**/
 					}
 					$tw.utils.removeClass($tw.pageContainer, 'tc-modal-displayed');
@@ -856,6 +856,7 @@ Formatted with `deno fmt`.
 			return crypto.subtle.sign('HMAC', this.mackey, utfenc.encode(x));
 		}
 
+		/** @param {ArrayBuffer} thash */
 		enckey(thash) {
 			return this.enckeys[new DataView(thash).getUint8(0) % this.enckeys.length];
 		}
@@ -1126,13 +1127,14 @@ Formatted with `deno fmt`.
 			const titleHashesToDelete = new Set();
 			const txn = this.db.transaction('tiddlers', 'readwrite');
 			for (const { thash, title, tiv, data, iv, mtime, deleted } of serverChanges) {
-				if (arrayEq(b64dec(thash), this.storyListHash)) continue;
+				const dhash = b64dec(thash);
+				if (!dhash || arrayEq(dhash, this.storyListHash)) continue;
 				const tid = {
-					thash: b64dec(thash),
-					title: b64dec(title),
-					tiv: b64dec(tiv),
-					data: b64dec(data),
-					iv: b64dec(iv),
+					thash: dhash.buffer,
+					title: title && b64dec(title).buffer,
+					tiv: tiv && b64dec(tiv).buffer,
+					data: data && b64dec(data).buffer,
+					iv: iv && b64dec(iv).buffer,
 					mtime: new Date(mtime),
 					deleted,
 				};
