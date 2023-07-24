@@ -582,7 +582,8 @@ Formatted with `deno fmt`.
 				const submit = dm('button', { attributes: { type: 'submit' }, text: 'Log in' });
 				const feedback = dm('div', { innerHTML: missingWarning });
 				modal.appendChild(body);
-				document.body.appendChild(wrapper);
+				const seemsLikeDocs = $tw.wiki.getTiddlersWithTag('TiddlyPWA Docs').length > 0;
+				if (!seemsLikeDocs) document.body.appendChild(wrapper);
 				let opened = false;
 				let timeoutModal;
 				const showForm = () => {
@@ -596,12 +597,17 @@ Formatted with `deno fmt`.
 				const openModal = () => {
 					if (opened) return;
 					opened = true;
+					if (seemsLikeDocs) document.body.appendChild(wrapper);
 					wrapper.appendChild(modal);
 					clearTimeout(timeoutModal);
 					modal.querySelector('input')?.focus();
 				};
 				const closeModal = () => {
-					document.body.removeChild(wrapper);
+					try {
+						document.body.removeChild(wrapper);
+					} finally {
+						/**/
+					}
 					$tw.utils.removeClass($tw.pageContainer, 'tc-modal-displayed');
 					$tw.utils.removeClass(document.body, 'tc-modal-prevent-scroll');
 					clearTimeout(timeoutModal);
@@ -621,7 +627,7 @@ Formatted with `deno fmt`.
 								handlerFunction: () => giveUp.abort(),
 							}],
 						})), 6900);
-					timeoutModal = setTimeout(openModal, 1000);
+					timeoutModal = setTimeout(openModal, seemsLikeDocs ? 6900 : 1000);
 					try {
 						const resp = await fetch('bootstrap.json', {
 							signal: giveUp.signal,
