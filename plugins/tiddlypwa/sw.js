@@ -11,8 +11,8 @@ const CACHE = 'tiddlypwa';
 
 async function fromNetCaching(req, cacheResp) {
 	// "preflight" for letting the server wake up if it's on a free service that suspends instances:
-	await fetch(req.url, { method: 'OPTIONS' });
-	const response = await fetch(req);
+	await fetch(req.url, { method: 'OPTIONS', cache: 'no-cache' });
+	const response = await fetch(new Request(req), { cache: 'no-cache' });
 	if (response.ok) {
 		const changed = cacheResp && (await response.clone().text() !== await cacheResp.text());
 		const cache = await caches.open(CACHE);
