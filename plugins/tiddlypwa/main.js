@@ -347,6 +347,7 @@ Formatted with `deno fmt`.
 				const reg = await navigator.serviceWorker.register('sw.js');
 				await reg.update();
 			} catch (e) {
+				console.error(e);
 				if (!navigator.onLine) return;
 				$tw.wiki.addTiddler({ title: '$:/status/TiddlyPWAWorkerError', text: e.message });
 				$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-sw-error');
@@ -490,7 +491,8 @@ Formatted with `deno fmt`.
 					if (dectitle === '$:/DefaultTiddlers') hasDefaultTiddlers = true;
 					this.modifiedQueue.add(dectitle);
 				} catch (e) {
-					this.logger.log('Title decrypt failed:', e);
+					this.logger.log('Title decrypt failed for:', thash);
+					console.error(e);
 					return false;
 				}
 			}
@@ -1042,13 +1044,15 @@ Formatted with `deno fmt`.
 								}
 							}
 						} catch (e) {
-							this.logger.alert('Failed to update local cache!', e);
+							this.logger.alert('Failed to update local cache!');
+							console.error(e);
 						}
 					}
 				}
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWAUploadResult', text: 'Uploaded:\n\n* ' + urls.join('\n* ') });
 			} catch (e) {
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWAUploadResult', text: 'Upload error: ' + e });
+				console.error(e);
 			} finally {
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWAUploading', text: 'no' });
 			}
@@ -1206,6 +1210,7 @@ Formatted with `deno fmt`.
 				} catch (e) {
 					if (e.name !== 'AbortError') {
 						this.logger.alert(`Could not sync with server "${server.url}"!`, e);
+						console.error(e);
 					}
 				}
 			}
