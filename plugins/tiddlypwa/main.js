@@ -817,7 +817,7 @@ Formatted with `deno fmt`.
 				text: await b64enc(this.salt),
 			});
 			this.initServiceWorker(); // don't await
-			if (freshDb) navigator.storage.persist().then(() => this.reflectStorageInfo());
+			if (freshDb && navigator.storage) navigator.storage.persist().then(() => this.reflectStorageInfo());
 		}
 
 		getStatus(cb) {
