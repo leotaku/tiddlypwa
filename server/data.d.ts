@@ -16,10 +16,10 @@ export type File = {
 
 export type Tiddler = {
 	thash: Uint8Array;
-	title?: Uint8Array;
-	tiv?: Uint8Array;
-	data?: Uint8Array;
 	iv?: Uint8Array;
+	ct?: Uint8Array;
+	sbiv?: Uint8Array;
+	sbct?: Uint8Array;
 	mtime: Date;
 	deleted: boolean;
 };

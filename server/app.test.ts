@@ -36,10 +36,10 @@ const uploadAppFile = (token: string, body: string, extra?: Record<string, unkno
 
 type tidjson = {
 	thash: string;
-	title?: string;
-	tiv?: string;
-	data?: string;
 	iv?: string;
+	ct?: string;
+	sbiv?: string;
+	sbct?: string;
 	mtime?: Date;
 	deleted?: boolean;
 };
@@ -52,8 +52,8 @@ Deno.test('basic syncing works', async () => {
 	// Basic write, with and without an mtime
 	assertEquals(
 		await sync(tok, 'test', s1date, new Date(0), [
-			{ thash: 'T3dP', data: '1111' },
-			{ thash: 'VXdV', data: '11111111', mtime: new Date(69) },
+			{ thash: 'T3dP', ct: '1111' },
+			{ thash: 'VXdV', ct: '11111111', mtime: new Date(69) },
 		]),
 		{ appEtag: null, serverChanges: [] },
 	);
@@ -65,19 +65,19 @@ Deno.test('basic syncing works', async () => {
 		serverChanges: [
 			{
 				thash: 'T3dP',
-				title: null,
-				tiv: null,
-				data: '1111',
 				iv: null,
+				ct: '1111',
+				sbiv: null,
+				sbct: null,
 				mtime: s1date.toISOString(),
 				deleted: false,
 			},
 			{
 				thash: 'VXdV',
-				title: null,
-				tiv: null,
-				data: '11111111',
 				iv: null,
+				ct: '11111111',
+				sbiv: null,
+				sbct: null,
 				mtime: new Date(69).toISOString(),
 				deleted: false,
 			},
@@ -88,10 +88,10 @@ Deno.test('basic syncing works', async () => {
 		serverChanges: [
 			{
 				thash: 'T3dP',
-				title: null,
-				tiv: null,
-				data: '1111',
 				iv: null,
+				ct: '1111',
+				sbiv: null,
+				sbct: null,
 				mtime: s1date.toISOString(),
 				deleted: false,
 			},
@@ -109,7 +109,7 @@ Deno.test('syncing a ton of tiddlers works', async () => {
 			'test',
 			s1date,
 			new Date(0),
-			[...Array(20).keys()].map((_, i) => ({ thash: btoa(i.toString()), data: 'T3dp' })),
+			[...Array(20).keys()].map((_, i) => ({ thash: btoa(i.toString()), ct: 'T3dp' })),
 		),
 		{ appEtag: null, serverChanges: [] },
 	);
@@ -118,10 +118,10 @@ Deno.test('syncing a ton of tiddlers works', async () => {
 		serverChanges: [...Array(20).keys()].map((_, i) => (
 			{
 				thash: btoa(i.toString()),
-				title: null,
-				tiv: null,
-				data: 'T3dp',
 				iv: null,
+				ct: 'T3dp',
+				sbiv: null,
+				sbct: null,
 				mtime: s1date.toISOString(),
 				deleted: false,
 			}
@@ -136,7 +136,7 @@ Deno.test('storing large data works', async () => {
 	const bigdata = Array(5592407).join('A') + '==';
 	assertEquals(
 		await sync(tok, 'test', s1date, new Date(0), [
-			{ thash: 'T3dP', data: bigdata },
+			{ thash: 'T3dP', ct: bigdata },
 		]),
 		{ appEtag: null, serverChanges: [] },
 	);
@@ -145,10 +145,10 @@ Deno.test('storing large data works', async () => {
 		serverChanges: [
 			{
 				thash: 'T3dP',
-				title: null,
-				tiv: null,
-				data: bigdata,
 				iv: null,
+				ct: bigdata,
+				sbiv: null,
+				sbct: null,
 				mtime: s1date.toISOString(),
 				deleted: false,
 			},

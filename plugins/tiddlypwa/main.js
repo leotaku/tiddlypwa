@@ -529,7 +529,9 @@ Formatted with `deno fmt`.
 				const seemsLikeDocs = $tw.wiki.getTiddlersWithTag('TiddlyPWA Docs').length > 0;
 				if (!seemsLikeDocs) modal.showWrapper();
 				if (freshDb) {
-					modal.setFeedback('<p>No wiki data found in the browser storage for this URL. Wait a second, looking around the server..</p>');
+					modal.setFeedback(
+						'<p>No wiki data found in the browser storage for this URL. Wait a second, looking around the server..</p>',
+					);
 					const giveUp = new AbortController();
 					modal.showGiveUpButtonDelayed(6900, () => giveUp.abort());
 					modal.showModalDelayed(seemsLikeDocs ? 6900 : 1000);
@@ -972,10 +974,10 @@ Formatted with `deno fmt`.
 				}
 				const tidjson = {
 					thash: await b64enc(thash),
-					title: await b64enc(ct),
-					tiv: await b64enc(iv),
-					data: sbct && await b64enc(sbct),
-					iv: sbiv && await b64enc(sbiv),
+					ct: ct && await b64enc(ct),
+					iv: iv && await b64enc(iv),
+					sbct: sbct && await b64enc(sbct),
+					sbiv: sbiv && await b64enc(sbiv),
 					mtime,
 					deleted,
 				};
@@ -1013,15 +1015,15 @@ Formatted with `deno fmt`.
 			const toDecrypt = [];
 			const titleHashesToDelete = new Set();
 			const txn = this.db.transaction('tiddlers', 'readwrite');
-			for (const { thash, title, tiv, data, iv, mtime, deleted } of serverChanges) {
+			for (const { thash, iv, ct, sbiv, sbct, mtime, deleted } of serverChanges) {
 				const dhash = b64dec(thash);
 				if (!dhash || arrayEq(dhash, this.storyListHash)) continue;
 				const tid = {
 					thash: dhash.buffer,
-					ct: title && b64dec(title).buffer,
-					iv: tiv && b64dec(tiv).buffer,
-					sbct: data && b64dec(data).buffer,
-					sbiv: iv && b64dec(iv).buffer,
+					ct: ct && b64dec(ct).buffer,
+					iv: iv && b64dec(iv).buffer,
+					sbct: sbct && b64dec(sbct).buffer,
+					sbiv: sbiv && b64dec(sbiv).buffer,
 					mtime: new Date(mtime),
 					deleted,
 				};

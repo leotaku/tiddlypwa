@@ -115,26 +115,26 @@ export class TiddlyPWASyncApp {
 		this.db.transaction(() => {
 			if (!(wiki as Wiki).authcode && authcode) this.db.updateWikiAuthcode(token, authcode);
 			if (!(wiki as Wiki).salt && salt) this.db.updateWikiSalt(token, salt as string);
-			for (const { thash, title, tiv, data, iv, mtime, deleted } of this.db.tiddlersChangedSince(token, modsince)) {
+			for (const { thash, iv, ct, sbiv, sbct, mtime, deleted } of this.db.tiddlersChangedSince(token, modsince)) {
 				// console.log('ServHas', base64nourl.encode(thash as Uint8Array), mtime, modsince, mtime < modsince);
 				serverChanges.push({
 					thash: thash ? base64nourl.encode(thash as Uint8Array) : null,
-					title: title ? base64nourl.encode(title as Uint8Array) : null,
-					tiv: tiv ? base64nourl.encode(tiv as Uint8Array) : null,
-					data: data ? base64nourl.encode(data as Uint8Array) : null,
 					iv: iv ? base64nourl.encode(iv as Uint8Array) : null,
+					ct: ct ? base64nourl.encode(ct as Uint8Array) : null,
+					sbiv: sbiv ? base64nourl.encode(sbiv as Uint8Array) : null,
+					sbct: sbct ? base64nourl.encode(sbct as Uint8Array) : null,
 					mtime,
 					deleted,
 				});
 			}
 			// console.log('ClntChg', clientChanges);
-			for (const { thash, title, tiv, data, iv, mtime, deleted } of clientChanges) {
+			for (const { thash, iv, ct, sbiv, sbct, mtime, deleted } of clientChanges) {
 				this.db.upsertTiddler(token, {
 					thash: base64nourl.decode(thash),
-					title: title && base64nourl.decode(title),
-					tiv: tiv && base64nourl.decode(tiv),
-					data: data && base64nourl.decode(data),
 					iv: iv && base64nourl.decode(iv),
+					ct: ct && base64nourl.decode(ct),
+					sbiv: sbiv && base64nourl.decode(sbiv),
+					sbct: sbct && base64nourl.decode(sbct),
 					mtime: new Date(mtime || now),
 					deleted: deleted || false,
 				});

@@ -48,10 +48,10 @@ export class SQLiteDatastore extends DB implements Datastore {
 				END;
 				CREATE TABLE tiddlers (
 					thash BLOB PRIMARY KEY NOT NULL,
-					title BLOB,
-					tiv BLOB,
-					data BLOB,
 					iv BLOB,
+					ct BLOB,
+					sbiv BLOB,
+					sbct BLOB,
 					mtime INTEGER NOT NULL,
 					deleted INTEGER NOT NULL DEFAULT 0,
 					token TEXT NOT NULL,
@@ -86,7 +86,7 @@ export class SQLiteDatastore extends DB implements Datastore {
 			{ token: string; authcode?: string; salt?: string; note?: string; tidsize: number; appsize: number }
 		>(sql`
 			SELECT token, authcode, salt, note, (
-				SELECT sum(length(thash) + length(title) + length(tiv) + length(data) + length(iv))
+				SELECT sum(length(thash) + length(iv) + length(ct) + length(sbiv) + length(sbct))
 				FROM tiddlers
 				WHERE tiddlers.token = wikis.token
 			) AS tidsize, (
@@ -145,15 +145,15 @@ export class SQLiteDatastore extends DB implements Datastore {
 		[],
 		{
 			thash: Uint8Array;
-			title?: Uint8Array;
-			tiv?: Uint8Array;
-			data?: Uint8Array;
 			iv?: Uint8Array;
+			ct?: Uint8Array;
+			sbiv?: Uint8Array;
+			sbct?: Uint8Array;
 			mtime: number;
 			deleted: number;
 		}
 	>(sql`
-		SELECT thash, title, tiv, data, iv, mtime, deleted
+		SELECT thash, iv, ct, sbiv, sbct, mtime, deleted
 		FROM tiddlers WHERE mtime > :modsince AND token = :token
 	`);
 	tiddlersChangedSince(token: string, since: Date) {
@@ -165,13 +165,13 @@ export class SQLiteDatastore extends DB implements Datastore {
 	}
 
 	#upsertQuery = this.prepareQuery(sql`
-		INSERT INTO tiddlers (thash, title, tiv, data, iv, mtime, deleted, token)
-		VALUES (:thash, :title, :tiv, :data, :iv, :mtime, :deleted, :token)
+		INSERT INTO tiddlers (thash, iv, ct, sbiv, sbct, mtime, deleted, token)
+		VALUES (:thash, :iv, :ct, :sbiv, :sbct, :mtime, :deleted, :token)
 		ON CONFLICT (thash) DO UPDATE SET
-		title = excluded.title,
-		tiv = excluded.tiv,
-		data = excluded.data,
 		iv = excluded.iv,
+		ct = excluded.ct,
+		sbiv = excluded.sbiv,
+		sbct = excluded.sbct,
 		mtime = excluded.mtime,
 		deleted = excluded.deleted
 		WHERE excluded.mtime > mtime
