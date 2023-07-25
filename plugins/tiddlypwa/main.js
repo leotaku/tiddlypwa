@@ -47,13 +47,13 @@ Formatted with `deno fmt`.
 	}
 
 	const knownErrors = {
-		EAUTH: 'Wrong password and/or sync token',
+		EAUTH: 'Wrong password, salt, and/or sync token',
 		EPROTO: 'Protocol incompatibility',
 		ETIMESYNC: 'The current time is too different between the server and the device',
 	};
 
 	const utfenc = new TextEncoder('utf-8');
-	const utfdec = new TextDecoder('utf-8');
+	const { b64enc, b64dec, encodeData, decodeData } = require('$:/plugins/valpackett/tiddlypwa/encoding.js');
 
 	function adb(req) {
 		return new Promise((resolve, reject) => {
@@ -84,93 +84,6 @@ Formatted with `deno fmt`.
 				rej = reject;
 			});
 		}
-	}
-
-	async function b64enc(data) {
-		if (!data) {
-			return null;
-		}
-
-		return (await new Promise((resolve) => {
-			const reader = new FileReader();
-			reader.onload = () => resolve(reader.result);
-			reader.readAsDataURL(new Blob([data]));
-		})).split(',', 2)[1];
-	}
-
-	function b64dec(base64) {
-		return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-	}
-
-	async function encodeTiddler(tiddler, isBin) {
-		if (!tiddler.fields.text) isBin = false;
-		const padTo = 256;
-		let flags = 0, gzchunks, gzlen = 0, binstr;
-		const jsonstr = JSON.stringify(
-			Object.keys(tiddler.fields).reduce((o, k) => {
-				if (k === 'text' && isBin) return o;
-				o[k] = tiddler.getFieldString(k);
-				return o;
-			}, Object.create(null)),
-		);
-		if (isBin) {
-			flags |= 1;
-			binstr = atob(tiddler.fields.text);
-		}
-		if (jsonstr.length > 240) {
-			flags |= 1 << 1;
-			gzchunks = [];
-			const rdr = new Blob([jsonstr]).stream().pipeThrough(new CompressionStream('gzip'));
-			for await (const chunk of rdr) {
-				gzchunks.push(chunk);
-				gzlen += chunk.length;
-			}
-		}
-
-		const resbuflen = 5 + (gzchunks ? gzlen : 3 * jsonstr.length) + (binstr ? 4 + binstr.length : 0);
-		const result = new Uint8Array(resbuflen + (padTo - (resbuflen % padTo)));
-		let bodylen;
-		if (gzchunks) {
-			let ptr = 5;
-			for (const chunk of gzchunks) {
-				result.set(chunk, ptr);
-				ptr += chunk.length;
-			}
-			bodylen = gzlen;
-		} else {
-			bodylen = utfenc.encodeInto(jsonstr, result.subarray(5, 5 + 3 * jsonstr.length)).written;
-		}
-		const dw = new DataView(result.buffer);
-		dw.setUint8(0, flags);
-		dw.setUint32(1, bodylen);
-		if (binstr) {
-			dw.setUint32(5 + bodylen, binstr.length);
-			for (let i = 0; i < binstr.length; i++) result[5 + bodylen + 4 + i] = binstr.charCodeAt(i);
-		}
-		const reslen = 5 + bodylen + (binstr ? 4 + binstr.length : 0);
-		return result.subarray(0, reslen + (padTo - (reslen % padTo)));
-	}
-
-	async function decodeTiddler(bin) {
-		const dw = new DataView(bin);
-		const flags = dw.getUint8(0);
-		const isBin = flags & 1;
-		const isGzipped = flags & (1 << 1);
-		const bodylen = dw.getUint32(1);
-		const body = new Uint8Array(bin, 5, bodylen);
-		let tiddler;
-		if (isGzipped) {
-			let json = '';
-			const rdr = new Blob([body]).stream().pipeThrough(new DecompressionStream('gzip'));
-			for await (const chunk of rdr) json += utfdec.decode(chunk);
-			tiddler = JSON.parse(json);
-		} else {
-			tiddler = JSON.parse(utfdec.decode(body));
-		}
-		if (isBin) {
-			tiddler.text = await b64enc(new Uint8Array(bin, 5 + bodylen + 4, dw.getUint32(5 + bodylen)));
-		}
-		return tiddler;
 	}
 
 	function formatBytes(bytes) {
@@ -477,53 +390,58 @@ Formatted with `deno fmt`.
 		}
 
 		isReady() {
-			return !!(this.db && this.enckeys);
+			return this.ready;
+		}
+
+		async parseEncryptedTiddler({ thash, iv, ct }) {
+			return JSON.parse(
+				await decodeData(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, this.enckey(thash), ct)),
+			);
 		}
 
 		async initialRead() {
 			this.storyListHash = await this.titlehash('$:/StoryList');
-			const titlesToRead = [];
+			const toDecrypt = [];
 			const it = adbiter(this.db.transaction('tiddlers').objectStore('tiddlers').openCursor());
-			for await (const { thash, title, tiv, deleted } of it) titlesToRead.push({ thash, title, tiv, deleted });
-			if (titlesToRead.length === 0) {
-				this.loadedStoryList = true; // not truly "loaded" but as in "enable saving it to the DB"
-				return true;
+			for await (const { thash, ct, iv, sbct, deleted } of it) {
+				toDecrypt.push({ thash, ct, iv, hasSepBody: !!sbct, deleted });
 			}
-			let hasStoryList = false, hasDefaultTiddlers = false;
-			this.logger.log('Titles to read: ', titlesToRead.length);
-			for (const { thash, title, tiv, deleted } of titlesToRead) {
+			this.logger.log('Titles to read: ', toDecrypt.length);
+			for (const { thash, ct, iv, hasSepBody, deleted } of toDecrypt) {
 				try {
-					if (arrayEq(thash, this.storyListHash)) hasStoryList = true;
 					if (deleted) continue;
-					const dectitle = utfdec.decode(
-						await crypto.subtle.decrypt(
-							{ name: 'AES-GCM', iv: tiv },
-							this.enckey(thash),
-							title,
-						),
-					).trimStart();
-					if (dectitle === '$:/DefaultTiddlers') hasDefaultTiddlers = true;
-					// Use lazy loading to avoid decrypting everything; note that _is_skinny is checked in saveTiddler to avoid losing everything
-					this.wiki.addTiddler({ title: dectitle, _is_skinny: true });
-					// These we need to queue up for eager-loadng to get DefaultTiddlers at least! And all the settings.
-					if (dectitle.startsWith('$:')) this.modifiedQueue.add(dectitle);
+					// not isReady yet, can safely addTiddler
+					const tid = await this.parseEncryptedTiddler({ thash, ct, iv });
+					if (hasSepBody) tid._is_skinny = true; // Lazy-load separate body
+					this.wiki.addTiddler(tid);
+					// These we need to queue up for eager-loadng no matter what, e.g. we could have a huge DefaultTiddlers end up as separate body
+					if (hasSepBody && tid.title.startsWith('$:')) this.modifiedQueue.add(tid.title);
 				} catch (e) {
-					this.logger.log('Title decryption failed for:', await b64enc(value.thash));
+					this.logger.log('Title decryption failed for:', await b64enc(thash));
 					console.error(e);
 					return false;
 				}
 			}
-			// consider these "loaded" if they did not exist in order to enable saving / let startup-opening proceed
-			if (!hasStoryList) this.loadedStoryList = true;
-			if (!hasDefaultTiddlers) this.loadedDefaultTiddlers = true;
-			this.backgroundSync();
-			setTimeout(() => {
-				try {
-					$tw.__update_tiddlypwa_manifest__();
-				} catch (e) {
-					console.error(e);
-				}
-			}, 300);
+			// Having a timeout larger than the $tw.utils.nextTick one of 0
+			// shoooould guarantee running after the change event handlers enqueued by addTiddler
+			await new Promise((resolve) =>
+				setTimeout(() => {
+					this.ready = true;
+					this.logger.log('ready to rock!');
+					try {
+						$tw.__update_tiddlypwa_manifest__();
+					} catch (e) {
+						console.error(e);
+					}
+					// Old $:/DefaultTiddlers has been used, rerun (XXX: openStartupTiddlers should be exported)
+					const aEL = $tw.rootWidget.addEventListener;
+					$tw.rootWidget.addEventListener = () => {};
+					require('$:/core/modules/startup/story.js').startup();
+					$tw.rootWidget.addEventListener = aEL;
+					resolve();
+					this.backgroundSync();
+				}, 10)
+			);
 			return true;
 		}
 
@@ -774,7 +692,7 @@ Formatted with `deno fmt`.
 					if (!this.salt) this.salt = crypto.getRandomValues(new Uint8Array(32));
 					console.time('hash');
 					const basebits = await argon.hash(utfenc.encode(passInput.value), this.salt, { m: 1 << 17, t: 2 });
-					console.timeLog('hash');
+					console.timeEnd('hash');
 					const basekey = await crypto.subtle.importKey('raw', basebits, 'HKDF', false, ['deriveKey']);
 					// fun: https://soatok.blog/2021/11/17/understanding-hkdf/ (but we don't have any randomness to shove into info)
 					// not fun: https://soatok.blog/2020/12/24/cryptographic-wear-out-for-symmetric-encryption/
@@ -881,23 +799,38 @@ Formatted with `deno fmt`.
 		async _saveTiddler(tiddler) {
 			const thash = await this.titlehash(tiddler.fields.title);
 			const key = this.enckey(thash);
-			const encoded = await encodeTiddler(tiddler, this.wiki.isBinaryTiddler(tiddler.fields.title));
+			const isBin = this.wiki.isBinaryTiddler(tiddler.fields.title);
+			const isSepBody = tiddler.fields.text && (isBin || tiddler.fields.text.length > 256);
+			const json = JSON.stringify(
+				Object.keys(tiddler.fields).reduce((o, k) => {
+					if (k === 'text' && isSepBody) return o;
+					o[k] = tiddler.getFieldString(k);
+					return o;
+				}, Object.create(null)),
+			);
 			// "if you use nonces longer than 12 bytes, they get hashed into 12 bytes anyway" - soatok.blog
 			const iv = crypto.getRandomValues(new Uint8Array(12));
-			const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
-			const tiv = crypto.getRandomValues(new Uint8Array(12));
-			const title = await crypto.subtle.encrypt(
-				{ name: 'AES-GCM', iv: tiv },
+			const ct = await crypto.subtle.encrypt(
+				{ name: 'AES-GCM', iv },
 				key,
-				utfenc.encode('\n'.repeat(64 - (tiddler.fields.title.length % 64)) + tiddler.fields.title),
+				await encodeData(json, false, 256),
 			);
+			let sbiv, sbct;
+			if (isSepBody) {
+				sbiv = crypto.getRandomValues(new Uint8Array(12));
+				sbct = await crypto.subtle.encrypt(
+					{ name: 'AES-GCM', iv: sbiv },
+					key,
+					await encodeData(tiddler.fields.text, isBin, 256),
+				);
+			}
 			await adb(
 				this.db.transaction('tiddlers', 'readwrite').objectStore('tiddlers').put({
 					thash, // The title hash is the primary key
-					title, // Just-the-title encrypted: used to avoid decrypting potentially large contents when lazy-loading
-					tiv,
-					data,
 					iv,
+					ct,
+					sbiv,
+					sbct,
 					mtime: new Date(), // Has to be unencrypted for sync conflict resolution
 					// also, *not* using the tiddler's modified field allows for importing tiddlers last modified in the past
 				}),
@@ -907,13 +840,7 @@ Formatted with `deno fmt`.
 
 		saveTiddler(tiddler, cb) {
 			if (tiddler.fields._is_skinny) {
-				return cb(null, '', 1);
-			}
-			if (tiddler.fields.title === '$:/StoryList' && !this.loadedStoryList) {
-				this.logger.log(
-					'Not saving $:/StoryList the first time (the one from before opening), it was:',
-					tiddler.fields.list,
-				);
+				// Shouldn't get these, but just to be 100% sure.
 				return cb(null, '', 1);
 			}
 			if (tiddler.fields.title === '$:/Import') {
@@ -937,8 +864,13 @@ Formatted with `deno fmt`.
 			const thash = await this.titlehash(title);
 			const obj = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').get(thash));
 			if (obj.deleted) return null;
-			const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.iv }, this.enckey(thash), obj.data);
-			return await decodeTiddler(data);
+			const tid = await this.parseEncryptedTiddler(obj);
+			if (obj.sbiv && obj.sbct) {
+				tid.text = await decodeData(
+					await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.sbiv }, this.enckey(thash), obj.sbct),
+				);
+			}
+			return tid;
 		}
 
 		loadTiddler(title, cb) {
@@ -948,16 +880,6 @@ Formatted with `deno fmt`.
 					// XXX: syncer should itself monitor for changes and recompile
 					$tw.syncer.filterFn = this.wiki.compileFilter(tiddler.text);
 				}
-				if (title === '$:/StoryList') this.loadedStoryList = true;
-				if (title === '$:/DefaultTiddlers') this.loadedDefaultTiddlers = true;
-				if (!this.openedDefaultTiddlers && this.loadedDefaultTiddlers && this.loadedStoryList) {
-					this.openedDefaultTiddlers = true;
-					// Old $:/DefaultTiddlers has been used, rerun (XXX: openStartupTiddlers should be exported)
-					const aEL = $tw.rootWidget.addEventListener;
-					$tw.rootWidget.addEventListener = () => {};
-					require('$:/core/modules/startup/story.js').startup();
-					$tw.rootWidget.addEventListener = aEL;
-				}
 			}).catch((e) => cb(e));
 		}
 
@@ -966,10 +888,10 @@ Formatted with `deno fmt`.
 			await adb(
 				this.db.transaction('tiddlers', 'readwrite').objectStore('tiddlers').put({
 					thash,
-					title: null,
-					tiv: null,
-					data: null,
-					iv: null,
+					iv: undefined,
+					ct: undefined,
+					sbiv: undefined,
+					sbct: undefined,
 					mtime: new Date(),
 					deleted: true,
 				}),
@@ -1088,17 +1010,17 @@ Formatted with `deno fmt`.
 			const clientChanges = [];
 			const changedKeys = new Set();
 			let newestChg = new Date(0);
-			for (const { thash, title, tiv, data, iv, mtime, deleted } of changes) {
+			for (const { thash, iv, ct, sbiv, sbct, mtime, deleted } of changes) {
 				if (arrayEq(thash, this.storyListHash)) continue;
 				if (mtime > newestChg) {
 					newestChg = mtime;
 				}
 				const tidjson = {
 					thash: await b64enc(thash),
-					title: await b64enc(title),
-					tiv: await b64enc(tiv),
-					data: await b64enc(data),
-					iv: await b64enc(iv),
+					title: await b64enc(ct),
+					tiv: await b64enc(iv),
+					data: sbct && await b64enc(sbct),
+					iv: sbiv && await b64enc(sbiv),
 					mtime,
 					deleted,
 				};
@@ -1133,7 +1055,7 @@ Formatted with `deno fmt`.
 				);
 			}
 			const { serverChanges, appEtag } = await resp.json();
-			const titlesToRead = [];
+			const toDecrypt = [];
 			const titleHashesToDelete = new Set();
 			const txn = this.db.transaction('tiddlers', 'readwrite');
 			for (const { thash, title, tiv, data, iv, mtime, deleted } of serverChanges) {
@@ -1141,10 +1063,10 @@ Formatted with `deno fmt`.
 				if (!dhash || arrayEq(dhash, this.storyListHash)) continue;
 				const tid = {
 					thash: dhash.buffer,
-					title: title && b64dec(title).buffer,
-					tiv: tiv && b64dec(tiv).buffer,
-					data: data && b64dec(data).buffer,
-					iv: iv && b64dec(iv).buffer,
+					ct: title && b64dec(title).buffer,
+					iv: tiv && b64dec(tiv).buffer,
+					sbct: data && b64dec(data).buffer,
+					sbiv: iv && b64dec(iv).buffer,
 					mtime: new Date(mtime),
 					deleted,
 				};
@@ -1161,7 +1083,7 @@ Formatted with `deno fmt`.
 				if (deleted) {
 					titleHashesToDelete.add(thash);
 				} else {
-					titlesToRead.push({ title: tid.title, thash: tid.thash, iv: tid.tiv });
+					toDecrypt.push({ thash: tid.thash, iv: tid.iv, ct: tid.ct, hasSepBody: !!tid.sbct });
 				}
 				if (tid.mtime > newestChg) {
 					newestChg = tid.mtime;
@@ -1173,17 +1095,12 @@ Formatted with `deno fmt`.
 					this.changesChannel.postMessage({ title, del: true });
 				}
 			}
-			for (const { title, thash, iv } of titlesToRead) {
-				const dectitle = utfdec.decode(
-					await crypto.subtle.decrypt(
-						{ name: 'AES-GCM', iv },
-						this.enckey(thash),
-						title,
-					),
-				).trimStart();
-				if (dectitle !== '$:/StoryList') {
-					this.modifiedQueue.add(dectitle);
-					this.changesChannel.postMessage({ title: dectitle });
+			for (const x of toDecrypt) {
+				const { title } = await this.parseEncryptedTiddler(x);
+				// isReady, so only go through the syncer mechanism here, even though that results in double decryption
+				if (title !== '$:/StoryList') {
+					this.modifiedQueue.add(title);
+					this.changesChannel.postMessage({ title });
 				}
 			}
 			if (appEtag && navigator.serviceWorker.controller) {
