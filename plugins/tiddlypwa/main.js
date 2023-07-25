@@ -54,6 +54,7 @@ Formatted with `deno fmt`.
 
 	const utfenc = new TextEncoder('utf-8');
 	const { b64enc, b64dec, encodeData, decodeData } = require('$:/plugins/valpackett/tiddlypwa/encoding.js');
+	const { BootstrapModal } = require('$:/plugins/valpackett/tiddlypwa/bootstrap.js');
 
 	function adb(req) {
 		return new Promise((resolve, reject) => {
@@ -399,7 +400,7 @@ Formatted with `deno fmt`.
 			);
 		}
 
-		async initialRead() {
+		async initialRead(modal) {
 			this.storyListHash = await this.titlehash('$:/StoryList');
 			const toDecrypt = [];
 			const it = adbiter(this.db.transaction('tiddlers').objectStore('tiddlers').openCursor());
@@ -408,6 +409,7 @@ Formatted with `deno fmt`.
 			}
 			this.logger.log('Titles to read: ', toDecrypt.length);
 			console.time('initialRead');
+			let cur = 0;
 			for (const { thash, ct, iv, hasSepBody, deleted } of toDecrypt) {
 				try {
 					if (deleted) continue;
@@ -437,6 +439,8 @@ Formatted with `deno fmt`.
 					});
 					$tw.syncer.storeTiddler(tid); // basically addTiddler but store info to prevent syncer from creating save tasks later
 					await themHandlers; // ha
+					if (cur % 10 == 0) modal.setFeedback(`<p>Loading tiddlers (${cur}/${toDecrypt.length})</p>`);
+					cur += 1;
 				} catch (e) {
 					this.logger.log('Title decryption failed for:', await b64enc(thash));
 					console.error(e);
@@ -518,71 +522,17 @@ Formatted with `deno fmt`.
 				}
 				this.wiki.addTiddler({ title: '$:/status/TiddlyPWARemembered', text: ses.length > 0 ? 'yes' : 'no' });
 			}
+			const modal = new BootstrapModal();
 			if (!this.enckeys) {
 				let bootstrapEndpoint;
-				$tw.utils.addClass($tw.pageContainer, 'tc-modal-displayed');
-				$tw.utils.addClass(document.body, 'tc-modal-prevent-scroll');
 				const [weAreScrewed, missingWarning] = this.missingFeaturesWarning();
-				const dm = $tw.utils.domMaker;
-				// below alerts, above hide-sidebar-btn
-				const wrapper = dm('div', { class: 'tc-modal-wrapper', style: { 'z-index': 1500 } });
-				wrapper.appendChild(dm('div', { class: 'tc-modal-backdrop', style: { opacity: '0.9' } }));
-				const modal = dm('div', { class: 'tc-modal' });
-				modal.appendChild(dm('div', { class: 'tc-modal-header', innerHTML: '<h3>Welcome to TiddlyPWA</h3>' }));
-				const body = dm('div', { class: 'tc-modal-body' });
-				const form = dm('form', { class: 'tiddlypwa-form' });
-				const passLbl = dm('label', { innerHTML: 'Password' });
-				const passInput = dm('input', { attributes: { type: 'password' } });
-				passLbl.appendChild(passInput);
-				const submit = dm('button', { attributes: { type: 'submit' }, text: 'Log in' });
-				const feedback = dm('div', { innerHTML: missingWarning });
-				modal.appendChild(body);
 				const seemsLikeDocs = $tw.wiki.getTiddlersWithTag('TiddlyPWA Docs').length > 0;
-				if (!seemsLikeDocs) document.body.appendChild(wrapper);
-				let opened = false;
-				let timeoutModal;
-				const showForm = () => {
-					if (!weAreScrewed) {
-						form.appendChild(passLbl);
-						form.appendChild(submit);
-					}
-					form.appendChild(feedback);
-					body.appendChild(form);
-				};
-				const openModal = () => {
-					if (opened) return;
-					opened = true;
-					if (seemsLikeDocs) document.body.appendChild(wrapper);
-					wrapper.appendChild(modal);
-					clearTimeout(timeoutModal);
-					modal.querySelector('input')?.focus();
-				};
-				const closeModal = () => {
-					try {
-						document.body.removeChild(wrapper);
-					} catch (_e) {
-						/**/
-					}
-					$tw.utils.removeClass($tw.pageContainer, 'tc-modal-displayed');
-					$tw.utils.removeClass(document.body, 'tc-modal-prevent-scroll');
-					clearTimeout(timeoutModal);
-				};
+				if (!seemsLikeDocs) modal.showWrapper();
 				if (freshDb) {
-					body.innerHTML =
-						'<p>No wiki data found in the browser storage for this URL. Wait a second, looking around the server..</p>';
+					modal.setFeedback('<p>No wiki data found in the browser storage for this URL. Wait a second, looking around the server..</p>');
 					const giveUp = new AbortController();
-					const timeoutGiveUpBtn = setTimeout(() =>
-						body.appendChild(dm('button', {
-							text: 'Give up waiting',
-							attributes: {
-								type: 'button',
-							},
-							eventListeners: [{
-								name: 'click',
-								handlerFunction: () => giveUp.abort(),
-							}],
-						})), 6900);
-					timeoutModal = setTimeout(openModal, seemsLikeDocs ? 6900 : 1000);
+					modal.showGiveUpButtonDelayed(6900, () => giveUp.abort());
+					modal.showModalDelayed(seemsLikeDocs ? 6900 : 1000);
 					try {
 						const resp = await fetch('bootstrap.json', {
 							signal: giveUp.signal,
@@ -596,10 +546,11 @@ Formatted with `deno fmt`.
 							alert('Something is weird with the server! Unexpected types in bootstrap.json');
 						}
 						bootstrapEndpoint = endpoint && { url: endpoint };
-						clearTimeout(timeoutGiveUpBtn);
+						modal.abortGiveUpButton();
+						modal.setFeedback('');
 						let askToken = true, askSalt = true;
 						if (state === 'docs') {
-							closeModal();
+							modal.close();
 							if (this.db) {
 								this.db.close();
 								await adb(indexedDB.deleteDatabase(`tiddlypwa:${location.pathname}`));
@@ -610,106 +561,78 @@ Formatted with `deno fmt`.
 							return;
 						}
 						if (weAreScrewed) {
-							body.innerHTML = '<p>Oops…</p>';
-							showForm();
+							modal.setBody('<p>Oops…</p>');
+							modal.setFeedback(missingWarning);
+							modal.showForm(true);
 							return;
 						}
 						if (state === 'localonly') {
-							body.innerHTML = '<p>Welcome to your new local-only wiki!</p>';
-							body.innerHTML +=
-								'<p>This wiki is not hosted on a sync server and will not automatically start to synchronize your data. However, you can always add sync servers later in the settings!</p>';
-							body.innerHTML += '<p><strong>Make up a strong password</strong> to protect the content of the wiki.</p>';
+							modal.setBody(`
+								<p>Welcome to your new local-only wiki!</p>
+								<p>This wiki is not hosted on a sync server and will not automatically start to synchronize your data. However, you can always add sync servers later in the settings!</p>
+								<p><strong>Make up a strong password</strong> to protect the content of the wiki.</p>
+							`);
 							askToken = false;
 						} else if (state === 'fresh') {
-							body.innerHTML = '<p>Welcome to your new synchronized wiki!</p>';
-							body.innerHTML +=
-								`<p>Paste the token given to you by the administrator of the sync server <code>${endpoint}</code> and <strong>make up a strong password</strong>.</p>`;
-							body.innerHTML +=
-								'<p>The password will be used to encrypt your data, hiding the content from the server and, if you choose not to use the "remember password" option, against unauthorized users of this device.</p>';
-							body.innerHTML +=
-								'<p>You will have to use that password to open this wiki on all synchronized devices/browsers.</p>';
+							modal.setBody(`
+								<p>Welcome to your new synchronized wiki!</p>
+								<p>Paste the token given to you by the administrator of the sync server <code>${endpoint}</code> and <strong>make up a strong password</strong>.</p>
+								<p>The password will be used to encrypt your data, hiding the content from the server and, if you choose not to use the "remember password" option, against unauthorized users of this device.</p>
+								<p>You will have to use that password to open this wiki on all synchronized devices/browsers.</p>
+							`);
 						} else if (state === 'existing') {
-							body.innerHTML = '<p>Welcome back to your synchronized wiki!</p>';
-							body.innerHTML +=
-								`<p>Log in using your credentials below. You are using the sync server <code>${endpoint}</code>.</p>`;
+							modal.setBody(`
+								<p>Welcome back to your synchronized wiki!</p>
+								<p>Log in using your credentials below. You are using the sync server <code>${endpoint}</code>.</p>
+							`);
 							askSalt = false;
 							this.salt = b64dec(salt);
 						} else {
-							body.innerHTML = '<p>We are not quite sure what happened on the sync server...</p>';
-							body.innerHTML += `<p>Try to log in using your credentials below anyway?</p>`;
+							modal.setBody(`
+								<p>We are not quite sure what happened on the sync server...</p>
+								<p>Try to log in using your credentials below anyway?</p>
+							`);
 						}
 						if (askToken) {
 							if (!bootstrapEndpoint) {
 								alert(`This sync server is misconfigured: no endpoint found while state is '${state}'.`);
 							}
-							const tokLbl = dm('label', { text: 'Sync token' });
-							tokLbl.appendChild(dm('input', {
-								attributes: { type: 'password' },
-								eventListeners: [{
-									name: 'change',
-									handlerFunction: (e) => bootstrapEndpoint.token = e.target.value.trim(),
-								}],
-							}));
-							form.appendChild(tokLbl);
+							modal.addTokenInput((e) => bootstrapEndpoint.token = e.target.value.trim());
 						}
 						if (askSalt) {
-							const saltDtl = dm('details', {
-								innerHTML: `
-								<summary>If you are going to sync a pre-existing wiki into this one, click here</summary>
-								<p>In order for such a sync to succeed, the wiki needs to be initialized with the same "salt" as well as the same password.</p>
-								<p>Copy the salt from the <strong>Settings</strong> → <strong>Storage and Sync</strong> page on the existing wiki, or from the sync admin interface.</p>
-							`,
+							modal.addSaltInput((e) => {
+								try {
+									this.salt = b64dec(e.target.value.trim());
+									modal.setFeedback('');
+								} catch (_e) {
+									modal.setFeedback('<p class=tiddlypwa-form-error>Could not decode the salt</p>');
+								}
 							});
-							const saltLbl = dm('label', { text: 'Salt' });
-							saltLbl.appendChild(dm('input', {
-								attributes: { type: 'text' },
-								eventListeners: [{
-									name: 'change',
-									handlerFunction: (e) => {
-										try {
-											this.salt = b64dec(e.target.value.trim());
-											feedback.innerHTML = '';
-										} catch (_e) {
-											feedback.innerHTML = '<p class=tiddlypwa-form-error>Could not decode the salt</p>';
-										}
-									},
-								}],
-							}));
-							saltDtl.appendChild(saltLbl);
-							form.appendChild(saltDtl);
 						}
-						showForm();
-						openModal();
+						modal.showForm();
 					} catch (e) {
 						console.error(e);
-						clearTimeout(timeoutGiveUpBtn);
-						body.innerHTML = '<p>Oops, looks like there is no information about the current server to be found!</p>';
-						body.innerHTML += '<p>Oh well, synchronization can be set up later in the settings.</p>';
-						showForm();
-						openModal();
+						modal.abortGiveUpButton();
+						modal.setBody(`
+							<p>Oops, looks like there is no information about the current server to be found!</p>
+							<p>Oh well, synchronization can be set up later in the settings.</p>
+						`);
+						modal.showForm();
 					}
 				} else {
-					body.innerHTML = '<p>Welcome back! Please enter your password.</p>';
-					showForm();
-					openModal();
+					modal.setBody('<p>Welcome back! Please enter your password.</p>');
+					modal.showForm();
 				}
 				const AW = require('$:/plugins/valpackett/tiddlypwa/argon2ian.js').ArgonWorker;
 				const argon = new AW();
 				await argon.ready;
 				let checked = false;
 				while (!checked) {
-					submit.disabled = false;
-					await new Promise((resolve, _reject) => {
-						form.onsubmit = (e) => {
-							e.preventDefault();
-							submit.disabled = true;
-							feedback.innerHTML = '<p>Please wait…</p>';
-							resolve();
-						};
-					});
+					const password = await modal.formSubmitted();
+					modal.setFeedback('<p>Please wait…</p>');
 					if (!this.salt) this.salt = crypto.getRandomValues(new Uint8Array(32));
 					console.time('hash');
-					const basebits = await argon.hash(utfenc.encode(passInput.value), this.salt, { m: 1 << 17, t: 2 });
+					const basebits = await argon.hash(utfenc.encode(password), this.salt, { m: 1 << 17, t: 2 });
 					console.timeEnd('hash');
 					const basekey = await crypto.subtle.importKey('raw', basebits, 'HKDF', false, ['deriveKey']);
 					// fun: https://soatok.blog/2021/11/17/understanding-hkdf/ (but we don't have any randomness to shove into info)
@@ -739,9 +662,9 @@ Formatted with `deno fmt`.
 						false,
 						['sign'],
 					);
-					checked = await this.initialRead();
+					checked = await this.initialRead(modal);
 					if (!checked) {
-						feedback.innerHTML += '<p class=tiddlypwa-form-error>Wrong password!</p>';
+						modal.setFeedback('<p class=tiddlypwa-form-error>Wrong password!</p>');
 					}
 				}
 				argon.terminate();
@@ -759,9 +682,10 @@ Formatted with `deno fmt`.
 					);
 					this.backgroundSync();
 				}
-				closeModal();
 			} else {
-				await this.initialRead();
+				modal.setBody('<p>Welcome back!</p>');
+				modal.showFormDelayed(500, true);
+				await this.initialRead(modal);
 			}
 			await this.reflectSyncServers();
 			await this.reflectStorageInfo();
@@ -769,6 +693,7 @@ Formatted with `deno fmt`.
 				title: '$:/status/TiddlyPWASalt',
 				text: await b64enc(this.salt),
 			});
+			modal.close();
 			this.initServiceWorker(); // don't await
 			if (freshDb && navigator.storage) navigator.storage.persist().then(() => this.reflectStorageInfo());
 		}
