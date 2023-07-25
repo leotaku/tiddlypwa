@@ -192,6 +192,8 @@ Formatted with `deno fmt`.
 	}
 
 	class PWAStorage {
+		supportsLazyLoading = true;
+
 		constructor(options) {
 			this.wiki = options.wiki;
 			this.logger = new $tw.utils.Logger('tiddlypwa-storage');
@@ -488,6 +490,7 @@ Formatted with `deno fmt`.
 				return true;
 			}
 			let hasStoryList = false, hasDefaultTiddlers = false;
+			this.logger.log('Titles to read: ', titlesToRead.length);
 			for (const { thash, title, tiv, deleted } of titlesToRead) {
 				try {
 					if (arrayEq(thash, this.storyListHash)) hasStoryList = true;
@@ -500,9 +503,12 @@ Formatted with `deno fmt`.
 						),
 					).trimStart();
 					if (dectitle === '$:/DefaultTiddlers') hasDefaultTiddlers = true;
-					this.modifiedQueue.add(dectitle);
+					// Use lazy loading to avoid decrypting everything; note that _is_skinny is checked in saveTiddler to avoid losing everything
+					this.wiki.addTiddler({ title: dectitle, _is_skinny: true });
+					// These we need to queue up for eager-loadng to get DefaultTiddlers at least! And all the settings.
+					if (dectitle.startsWith('$:')) this.modifiedQueue.add(dectitle);
 				} catch (e) {
-					this.logger.log('Title decrypt failed for:', thash);
+					this.logger.log('Title decryption failed for:', await b64enc(value.thash));
 					console.error(e);
 					return false;
 				}
@@ -888,7 +894,7 @@ Formatted with `deno fmt`.
 			await adb(
 				this.db.transaction('tiddlers', 'readwrite').objectStore('tiddlers').put({
 					thash, // The title hash is the primary key
-					title, // Just-the-title encrypted: used to avoid decrypting other stuff in getSkinnyTiddlers
+					title, // Just-the-title encrypted: used to avoid decrypting potentially large contents when lazy-loading
 					tiv,
 					data,
 					iv,
@@ -900,6 +906,9 @@ Formatted with `deno fmt`.
 		}
 
 		saveTiddler(tiddler, cb) {
+			if (tiddler.fields._is_skinny) {
+				return cb(null, '', 1);
+			}
 			if (tiddler.fields.title === '$:/StoryList' && !this.loadedStoryList) {
 				this.logger.log(
 					'Not saving $:/StoryList the first time (the one from before opening), it was:',
