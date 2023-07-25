@@ -782,7 +782,10 @@ Formatted with `deno fmt`.
 					false, // isReadOnly
 					false, // isAnonymous
 				)
-			).catch((e) => cb(e));
+			).catch((e) => {
+				console.error(e);
+				cb(e);
+			});
 		}
 
 		getTiddlerInfo(_tiddler) {
@@ -875,7 +878,10 @@ Formatted with `deno fmt`.
 					this.changesChannel.postMessage({ title: tiddler.fields.title });
 					this.backgroundSync();
 				}
-			}).catch((e) => cb(e));
+			}).catch((e) => {
+				console.error(e);
+				cb(e);
+			});
 		}
 
 		async _loadTiddler(title) {
@@ -898,7 +904,10 @@ Formatted with `deno fmt`.
 					// XXX: syncer should itself monitor for changes and recompile
 					$tw.syncer.filterFn = this.wiki.compileFilter(tiddler.text);
 				}
-			}).catch((e) => cb(e));
+			}).catch((e) => {
+				console.error(e);
+				cb(e);
+			});
 		}
 
 		async _deleteTiddler(title) {
@@ -922,7 +931,10 @@ Formatted with `deno fmt`.
 				cb(null);
 				this.changesChannel.postMessage({ title, del: true });
 				this.backgroundSync();
-			}).catch((e) => cb(e));
+			}).catch((e) => {
+				console.error(e);
+				cb(e);
+			});
 		}
 
 		async uploadAppWiki(variables) {
