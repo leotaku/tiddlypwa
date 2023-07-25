@@ -408,8 +408,9 @@ Formatted with `deno fmt`.
 				toDecrypt.push({ thash, ct, iv, hasSepBody: !!(sbct && sbiv), deleted });
 			}
 			this.logger.log('Titles to read: ', toDecrypt.length);
-			console.time('initialRead');
+			console.time('initial decrypt');
 			let cur = 0;
+			const toAdd = [];
 			for (const { thash, ct, iv, hasSepBody, deleted } of toDecrypt) {
 				try {
 					if (deleted) continue;
@@ -427,19 +428,8 @@ Formatted with `deno fmt`.
 							);
 						} else tid._is_skinny = true; // Lazy-load separate body
 					}
-					// Carefully prevent syncer from re-saving everything we add, and prevent unlocking before the read is actually done
-					// TODO: try to optimize by batching all the changes
-					const themHandlers = new Promise((resolve) => {
-						const wiki = this.wiki;
-						// This relies on the sequential ordering of handlers inside the event implementation
-						this.wiki.addEventListener('change', /* not arrow */ function () {
-							wiki.removeEventListener('change', this);
-							resolve();
-						});
-					});
-					$tw.syncer.storeTiddler(tid); // basically addTiddler but store info to prevent syncer from creating save tasks later
-					await themHandlers; // ha
-					if (cur % 10 == 0) modal.setFeedback(`<p>Loading tiddlers (${cur}/${toDecrypt.length})</p>`);
+					toAdd.push(tid);
+					if (cur % 100 == 0) modal.setFeedback(`<p>Decrypting tiddlers… (${cur}/${toDecrypt.length})</p>`);
 					cur += 1;
 				} catch (e) {
 					this.logger.log('Title decryption failed for:', await b64enc(thash));
@@ -447,7 +437,23 @@ Formatted with `deno fmt`.
 					return false;
 				}
 			}
-			console.timeEnd('initialRead');
+			console.timeEnd('initial decrypt');
+			console.time('initial add');
+			modal.setFeedback(`<p>Loading tiddlers…</p>`);
+			// Waiting for one change event prevents unlocking before the adding is actually done
+			const themHandlers = new Promise((resolve) => {
+				const wiki = this.wiki;
+				// This relies on the sequential ordering of handlers inside the event implementation
+				this.wiki.addEventListener('change', /* not arrow */ function () {
+					wiki.removeEventListener('change', this);
+					resolve();
+				});
+			});
+			// Adds are batched all together SYNCHRONOUSLY to prevent event handlers from running on every add!
+			// storeTiddler is basically addTiddler but store info to prevent syncer from creating save tasks later
+			for (const tid of toAdd) $tw.syncer.storeTiddler(tid);
+			await themHandlers; // ha
+			console.timeEnd('initial add');
 			this.ready = true;
 			setTimeout(() => {
 				try {
