@@ -407,6 +407,7 @@ Formatted with `deno fmt`.
 				toDecrypt.push({ thash, ct, iv, hasSepBody: !!(sbct && sbiv), deleted });
 			}
 			this.logger.log('Titles to read: ', toDecrypt.length);
+			console.time('initialRead');
 			for (const { thash, ct, iv, hasSepBody, deleted } of toDecrypt) {
 				try {
 					if (deleted) continue;
@@ -424,33 +425,41 @@ Formatted with `deno fmt`.
 							);
 						} else tid._is_skinny = true; // Lazy-load separate body
 					}
-					this.wiki.addTiddler(tid);
+					// Carefully prevent syncer from re-saving everything we add, and prevent unlocking before the read is actually done
+					// TODO: try to optimize by batching all the changes
+					const themHandlers = new Promise((resolve) => {
+						const wiki = this.wiki;
+						// This relies on the sequential ordering of handlers inside the event implementation
+						this.wiki.addEventListener('change', /* not arrow */ function () {
+							wiki.removeEventListener('change', this);
+							resolve();
+						});
+					});
+					$tw.syncer.storeTiddler(tid); // basically addTiddler but store info to prevent syncer from creating save tasks later
+					await themHandlers; // ha
 				} catch (e) {
 					this.logger.log('Title decryption failed for:', await b64enc(thash));
 					console.error(e);
 					return false;
 				}
 			}
-			// Having a timeout larger than the $tw.utils.nextTick one of 0
-			// shoooould guarantee running after the change event handlers enqueued by addTiddler
-			await new Promise((resolve) =>
-				setTimeout(() => {
-					this.ready = true;
-					this.logger.log('ready to rock!');
-					try {
-						$tw.__update_tiddlypwa_manifest__();
-					} catch (e) {
-						console.error(e);
-					}
-					// Old $:/DefaultTiddlers has been used, rerun (XXX: openStartupTiddlers should be exported)
-					const aEL = $tw.rootWidget.addEventListener;
-					$tw.rootWidget.addEventListener = () => {};
-					require('$:/core/modules/startup/story.js').startup();
-					$tw.rootWidget.addEventListener = aEL;
-					resolve();
-					this.backgroundSync();
-				}, 10)
-			);
+			console.timeEnd('initialRead');
+			this.ready = true;
+			setTimeout(() => {
+				try {
+					$tw.__update_tiddlypwa_manifest__();
+				} catch (e) {
+					console.error(e);
+				}
+			}, 300);
+			{
+				// Old $:/DefaultTiddlers has been used, rerun (XXX: openStartupTiddlers should be exported)
+				const aEL = $tw.rootWidget.addEventListener;
+				$tw.rootWidget.addEventListener = () => {};
+				require('$:/core/modules/startup/story.js').startup();
+				$tw.rootWidget.addEventListener = aEL;
+			}
+			this.backgroundSync();
 			return true;
 		}
 
