@@ -67,6 +67,25 @@ Formatted with `deno fmt`.
 		});
 	}
 
+	// WARNING! DO NOT INTERMIX WITH OTHER AWAITS!
+	async function* adbiter(req) {
+		let res, rej;
+		let cursor = await new Promise((resolve, reject) => {
+			res = resolve;
+			rej = reject;
+			req.onerror = (evt) => rej(evt.target.error);
+			req.onsuccess = (evt) => res(evt.target.result);
+		});
+		while (cursor) {
+			yield cursor.value;
+			cursor.continue();
+			cursor = await new Promise((resolve, reject) => {
+				res = resolve;
+				rej = reject;
+			});
+		}
+	}
+
 	async function b64enc(data) {
 		if (!data) {
 			return null;
@@ -462,17 +481,8 @@ Formatted with `deno fmt`.
 		async initialRead() {
 			this.storyListHash = await this.titlehash('$:/StoryList');
 			const titlesToRead = [];
-			await new Promise((resolve) => {
-				this.db.transaction('tiddlers').objectStore('tiddlers').openCursor().onsuccess = (evt) => {
-					const cursor = evt.target.result;
-					if (!cursor) {
-						return resolve(true);
-					}
-					const { thash, title, tiv, deleted } = cursor.value;
-					titlesToRead.push({ thash, title, tiv, deleted });
-					cursor.continue();
-				};
-			});
+			const it = adbiter(this.db.transaction('tiddlers').objectStore('tiddlers').openCursor());
+			for await (const { thash, title, tiv, deleted } of it) titlesToRead.push({ thash, title, tiv, deleted });
 			if (titlesToRead.length === 0) {
 				this.loadedStoryList = true; // not truly "loaded" but as in "enable saving it to the DB"
 				return true;
@@ -1064,18 +1074,8 @@ Formatted with `deno fmt`.
 			this.logger.log('sync started', url, lastSync, all);
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncingWith', text: url });
 			const changes = [];
-			await new Promise((resolve) =>
-				this.db.transaction('tiddlers', 'readwrite').objectStore('tiddlers').openCursor().onsuccess = (evt) => {
-					const cursor = evt.target.result;
-					if (!cursor) {
-						return resolve();
-					}
-					if (all || cursor.value.mtime > lastSync) {
-						changes.push(cursor.value);
-					}
-					cursor.continue();
-				}
-			);
+			const it = adbiter(this.db.transaction('tiddlers').objectStore('tiddlers').openCursor());
+			for await (const tid of it) if (all || tid.mtime > lastSync) changes.push(tid);
 			const clientChanges = [];
 			const changedKeys = new Set();
 			let newestChg = new Date(0);
