@@ -403,8 +403,8 @@ Formatted with `deno fmt`.
 			this.storyListHash = await this.titlehash('$:/StoryList');
 			const toDecrypt = [];
 			const it = adbiter(this.db.transaction('tiddlers').objectStore('tiddlers').openCursor());
-			for await (const { thash, ct, iv, sbct, deleted } of it) {
-				toDecrypt.push({ thash, ct, iv, hasSepBody: !!sbct, deleted });
+			for await (const { thash, ct, iv, sbct, sbiv, deleted } of it) {
+				toDecrypt.push({ thash, ct, iv, hasSepBody: !!(sbct && sbiv), deleted });
 			}
 			this.logger.log('Titles to read: ', toDecrypt.length);
 			for (const { thash, ct, iv, hasSepBody, deleted } of toDecrypt) {
@@ -412,10 +412,19 @@ Formatted with `deno fmt`.
 					if (deleted) continue;
 					// not isReady yet, can safely addTiddler
 					const tid = await this.parseEncryptedTiddler({ thash, ct, iv });
-					if (hasSepBody) tid._is_skinny = true; // Lazy-load separate body
+					if (hasSepBody) {
+						// These we need to eager-load no matter what, e.g. we could have a huge DefaultTiddlers end up as separate body
+						// Tags are also checked for $: mostly just due to $:/tags/ManifestIcon
+						if (
+							tid.title.startsWith('$:') ||
+							(Array.isArray(tid.tags) && tid.tags.find((x) => typeof x === 'string' && x.startsWith('$:')))
+						) {
+							tid.text = await decodeData(
+								await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.sbiv }, this.enckey(thash), obj.sbct),
+							);
+						} else tid._is_skinny = true; // Lazy-load separate body
+					}
 					this.wiki.addTiddler(tid);
-					// These we need to queue up for eager-loadng no matter what, e.g. we could have a huge DefaultTiddlers end up as separate body
-					if (hasSepBody && tid.title.startsWith('$:')) this.modifiedQueue.add(tid.title);
 				} catch (e) {
 					this.logger.log('Title decryption failed for:', await b64enc(thash));
 					console.error(e);
