@@ -1,7 +1,7 @@
 [build]
 publish = "output"
 command = """
-  mkdir notebook; curl -L https://github.com/valpackett/Notebook/archive/94bd85d9e29ab4c478b197d406d83ab89271f2ef.tar.gz | tar -xvzf - -C notebook --strip-components=1 &&
+  mkdir notebook; curl -L https://github.com/valpackett/Notebook/archive/e2c61ccd6e9db5cfcbc77e54eccc8b5961da5831.tar.gz | tar -xvzf - -C notebook --strip-components=1 &&
   TIDDLYWIKI_THEME_PATH=notebook/themes TIDDLYWIKI_PLUGIN_PATH=notebook/plugins npx tiddlywiki@5.3.0 --build
 """
 
