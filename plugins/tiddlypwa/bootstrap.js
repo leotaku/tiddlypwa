@@ -16,12 +16,9 @@ Formatted with `deno fmt`.
 
 	module.exports.BootstrapModal = class {
 		wrapper = dm('div', { class: 'tc-modal-wrapper', style: { 'z-index': 1500 } }); // below alerts, above hide-sidebar-btn
-		showWrapper() {
-			if (this.wrapperShown) return;
-			this.wrapperShown = true;
-			$tw.utils.addClass($tw.pageContainer, 'tc-modal-displayed');
+		constructor() {
 			$tw.utils.addClass(document.body, 'tc-modal-prevent-scroll');
-			this.wrapper.appendChild(dm('div', { class: 'tc-modal-backdrop', style: { opacity: '0.9' } }));
+			this.wrapper.appendChild(dm('div', { class: 'tc-modal-backdrop' }));
 			document.body.appendChild(this.wrapper);
 		}
 
@@ -30,7 +27,6 @@ Formatted with `deno fmt`.
 		showModal() {
 			if (this.modalShown) return;
 			this.modalShown = true;
-			this.showWrapper();
 			this.modal.appendChild(dm('div', { class: 'tc-modal-header', innerHTML: '<h3>Welcome to TiddlyPWA</h3>' }));
 			this.modal.appendChild(this.modalBody);
 			this.wrapper.appendChild(this.modal);
@@ -43,9 +39,7 @@ Formatted with `deno fmt`.
 
 		close() {
 			clearTimeout(this.modalTimeout);
-			if (!this.wrapperShown) return;
 			document.body.removeChild(this.wrapper);
-			$tw.utils.removeClass($tw.pageContainer, 'tc-modal-displayed');
 			$tw.utils.removeClass(document.body, 'tc-modal-prevent-scroll');
 		}
 
