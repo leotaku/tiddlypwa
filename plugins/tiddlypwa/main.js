@@ -1043,7 +1043,7 @@ Formatted with `deno fmt`.
 				if (deleted) {
 					titleHashesToDelete.add(thash);
 				} else {
-					toDecrypt.push({ thash: tid.thash, iv: tid.iv, ct: tid.ct, hasSepBody: !!tid.sbct });
+					toDecrypt.push(tid);
 				}
 				if (tid.mtime > newestChg) {
 					newestChg = tid.mtime;
