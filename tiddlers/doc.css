@@ -9,7 +9,7 @@ Licensed under 0BSD, see license.tid.
 [data-tiddler-title="TiddlyPWA"] .tc-tiddler-body { text-align: center; }
 
 .tpwadoc-logos { display: flex; margin: 1rem 0; gap: .5rem; user-select: none; pointer-events: none; }
-.tpwadoc-logos > :first-child { width: 35%; }
+.tpwadoc-logos > :first-child { width: 25%; }
 .tpwadoc-logos > :last-child { margin-right: 1rem; }
 
 .tpwadoc-card { display: block; text-align: center; background: var(--bg, #fff); color: #333; text-decoration: none; border-radius: 5px; padding: 1.5rem 1rem; transition: ease-in-out .3s transform; text-shadow: 0 1px color-mix(in srgb, var(--bg) 70%, #fff); }
