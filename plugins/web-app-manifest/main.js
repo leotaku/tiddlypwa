@@ -20,8 +20,9 @@ Formatted with `deno fmt`.
 			document.head.appendChild(link);
 		}
 
-		function isTiddlerRelevant(x) {
-			return x !== '$:/StoryList' && x.startsWith('$:/') && !x.startsWith('$:/state') && !x.startsWith('$:/temp') &&
+		function isTiddlerMaybeRelevant(x) {
+			return x !== '$:/StoryList' && x !== '$:/HistoryList' && x.startsWith('$:/') && !x.startsWith('$:/state') &&
+				!x.startsWith('$:/temp') &&
 				!x.startsWith('$:/status');
 		}
 
@@ -55,11 +56,11 @@ Formatted with `deno fmt`.
 				),
 				icons: [],
 			};
-			const icons = $tw.wiki.getTiddlersWithTag('$:/tags/ManifestIcon');
-			if (icons.length == 0 && $tw.wiki.getTiddler('$:/favicon.ico')) {
-				icons.push('$:/favicon.ico');
+			const iconTids = $tw.wiki.getTiddlersWithTag('$:/tags/ManifestIcon');
+			if (iconTids.length == 0 && $tw.wiki.getTiddler('$:/favicon.ico')) {
+				iconTids.push('$:/favicon.ico');
 			}
-			for (const x of icons) {
+			for (const x of iconTids) {
 				if (!$tw.wiki.getTiddler(x).isDraft()) {
 					manifest.icons.push(parseIconTiddler(x));
 				}
@@ -72,9 +73,7 @@ Formatted with `deno fmt`.
 		$tw.__update_tiddlypwa_manifest__ = render;
 		render();
 		$tw.wiki.addEventListener('change', (chg) => {
-			if (Object.keys(chg).some(isTiddlerRelevant)) {
-				render();
-			}
+			if (Object.keys(chg).some(isTiddlerMaybeRelevant)) render();
 		});
 		$tw.rootWidget.addEventListener('tiddlypwa-get-manifest', (_evt) => {
 			const a = document.createElement('a');
