@@ -60,5 +60,5 @@ You can use the {{$:/core/ui/Buttons/export-page}} feature (which does not provi
 the "{{$:/plugins/valpackett/tiddlypwa/save-dialog-export!!caption}}" tab in the {{$:/core/ui/Buttons/save-wiki}} menu to export the wiki as a traditional single-file TiddlyWiki
 (with encryption if you want).
 
-To learn more about how TiddlyPWA works and to support the author, visit <a href={{$:/plugins/valpackett/tiddlypwa!!demo}}>the official website</a>.
+To learn more about how TiddlyPWA works and to support the author, visit <a class="tc-tiddlylink-external" href={{$:/plugins/valpackett/tiddlypwa!!demo}}>the official website</a>.
 Enjoy your wiki!

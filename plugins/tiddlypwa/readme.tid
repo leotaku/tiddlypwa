@@ -6,7 +6,7 @@ TiddlyPWA is a storage and synchronization solution that turns TiddlyWiki into a
 Progressive Web App that works offline with local encrypted storage for all your tiddlers,
 and synchronizes your wiki across devices in real time using a tiny server app you can easily self-host for free.
 
-Read more about TiddlyPWA on <a href={{$:/plugins/valpackett/tiddlypwa!!demo}}>the documentation website</a>!
+Read more about TiddlyPWA on <a class="tc-tiddlylink-external" href={{$:/plugins/valpackett/tiddlypwa!!demo}}>the documentation website</a>!
 
 TiddlyPWA was created by [[Val Packett|https://val.packett.cool/]] ←
 please do [[throw some monies her way|https://www.patreon.com/valpackett]] :3
