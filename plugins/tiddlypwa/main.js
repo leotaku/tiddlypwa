@@ -438,14 +438,16 @@ Formatted with `deno fmt`.
 			console.time('initial add');
 			this.modal.setFeedback(`<p>Loading tiddlers…</p>`);
 			// Waiting for one change event prevents unlocking before the adding is actually done
-			const themHandlers = toAdd.length > 0 ? new Promise((resolve) => {
-				const wiki = this.wiki;
-				// This relies on the sequential ordering of handlers inside the event implementation
-				this.wiki.addEventListener('change', /* not arrow */ function () {
-					wiki.removeEventListener('change', this);
-					resolve();
-				});
-			}) : Promise.resolve();
+			const themHandlers = toAdd.length > 0
+				? new Promise((resolve) => {
+					const wiki = this.wiki;
+					// This relies on the sequential ordering of handlers inside the event implementation
+					this.wiki.addEventListener('change', /* not arrow */ function () {
+						wiki.removeEventListener('change', this);
+						resolve();
+					});
+				})
+				: Promise.resolve();
 			// Adds are batched all together SYNCHRONOUSLY to prevent event handlers from running on every add!
 			// storeTiddler is basically addTiddler but store info to prevent syncer from creating save tasks later
 			for (const tid of toAdd) $tw.syncer.storeTiddler(tid);
