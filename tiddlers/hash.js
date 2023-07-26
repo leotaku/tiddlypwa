@@ -1,5 +1,6 @@
 /*\
 title: $:/hash.js
+tags: [[TiddlyPWA Docs]]
 type: application/javascript
 module-type: widget
 
