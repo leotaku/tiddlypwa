@@ -402,21 +402,17 @@ Formatted with `deno fmt`.
 
 		async initialRead(modal) {
 			this.storyListHash = await this.titlehash('$:/StoryList');
-			const toDecrypt = [];
-			const it = adbiter(this.db.transaction('tiddlers').objectStore('tiddlers').openCursor());
-			for await (const { thash, ct, iv, sbct, sbiv, deleted } of it) {
-				toDecrypt.push({ thash, ct, iv, hasSepBody: !!(sbct && sbiv), deleted });
-			}
+			const toDecrypt = await adb(this.db.transaction('tiddlers').objectStore('tiddlers').getAll());
 			this.logger.log('Titles to read: ', toDecrypt.length);
 			console.time('initial decrypt');
 			let cur = 0;
 			const toAdd = [];
-			for (const { thash, ct, iv, hasSepBody, deleted } of toDecrypt) {
+			for (const { thash, iv, ct, sbiv, sbct, deleted } of toDecrypt) {
 				try {
 					if (deleted) continue;
 					// not isReady yet, can safely addTiddler
 					const tid = await this.parseEncryptedTiddler({ thash, ct, iv });
-					if (hasSepBody) {
+					if (sbiv && sbct) {
 						// These we need to eager-load no matter what, e.g. we could have a huge DefaultTiddlers end up as separate body
 						// Tags are also checked for $: mostly just due to $:/tags/ManifestIcon
 						if (
@@ -424,7 +420,7 @@ Formatted with `deno fmt`.
 							(Array.isArray(tid.tags) && tid.tags.find((x) => typeof x === 'string' && x.startsWith('$:')))
 						) {
 							tid.text = await decodeData(
-								await crypto.subtle.decrypt({ name: 'AES-GCM', iv: obj.sbiv }, this.enckey(thash), obj.sbct),
+								await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sbiv }, this.enckey(thash), sbct),
 							);
 						} else tid._is_skinny = true; // Lazy-load separate body
 					}
