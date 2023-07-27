@@ -415,10 +415,10 @@ Formatted with `deno fmt`.
 					const tid = await this.parseEncryptedTiddler({ thash, ct, iv });
 					if (sbiv && sbct) {
 						// These we need to eager-load no matter what, e.g. we could have a huge DefaultTiddlers end up as separate body
-						// Tags are also checked for $: mostly just due to $:/tags/ManifestIcon
+						// Tags are also checked for $: due to $:/tags/Macro, $:/tags/ManifestIcon, etc.
 						if (
 							tid.title.startsWith('$:') ||
-							(Array.isArray(tid.tags) && tid.tags.find((x) => typeof x === 'string' && x.startsWith('$:')))
+							$tw.Tiddler.fieldModules.tags.parse(tid.tags)?.find((x) => typeof x === 'string' && x.startsWith('$:'))
 						) {
 							tid.text = await decodeData(
 								await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sbiv }, this.enckey(thash), sbct),
