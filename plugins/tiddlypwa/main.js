@@ -105,6 +105,14 @@ Formatted with `deno fmt`.
 		return url === `${location.origin}${location.pathname}${location.search}`;
 	}
 
+	class FetchError extends Error {
+		constructor(cause) {
+			super('fetch failed');
+			this.cause = cause;
+			this.name = 'FetchError';
+		}
+	}
+
 	class PWAStorage {
 		supportsLazyLoading = true;
 		modal = new BootstrapModal();
@@ -1030,6 +1038,8 @@ Formatted with `deno fmt`.
 					lastSync,
 					clientChanges,
 				}),
+			}).catch((e) => {
+				throw new FetchError(e); // so silly that fetch throws inconsistent stuff across browsers
 			});
 			if (!resp.ok) {
 				throw new Error(
@@ -1122,8 +1132,17 @@ Formatted with `deno fmt`.
 					server.lastSync = await this._syncOneUnlocked(server, all);
 					await adb(this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put(server, key));
 					hadSuccess = true;
+					this.hadFetchError = false;
 				} catch (e) {
-					if (e.name !== 'AbortError') {
+					if (e.name === 'AbortError') {
+						/* Not an error */
+					} else if (e.name === 'FetchError') {
+						if (!this.hadFetchError) {
+							this.logger.alert(`Could not sync with server "${server.url}"! You might be offline (or the server is).`);
+							console.error(e);
+							this.hadFetchError = true;
+						}
+					} else {
 						this.logger.alert(`Could not sync with server "${server.url}"!`, e);
 						console.error(e);
 					}
