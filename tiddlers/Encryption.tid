@@ -18,6 +18,9 @@ This does mean that ''you must not lose your password'' if you want to keep havi
 You cannot directly change the password, but you can export tiddlers (unencrypted!) using the "export all → JSON" functionality in the "Tools" menu of the sidebar
 and import them into a new wiki that uses a different password.
 
+Disclaimer: don't quite go and replace your password manager's notes section with TiddlyPWA yet!
+TiddlyPWA is very much beta software that hasn't been audited independently or anything.
+
 !! Active Attacks
 
 If you host the app wiki on the sync server, i.e. if you use the default recommended full experience, it is true
