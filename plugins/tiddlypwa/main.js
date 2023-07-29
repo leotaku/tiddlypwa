@@ -580,6 +580,7 @@ Formatted with `deno fmt`.
 								<p><strong>Make up a strong password</strong> to protect the content of the wiki.</p>
 							`);
 							askToken = false;
+							this.modal.setFresh();
 						} else if (state === 'fresh') {
 							this.modal.setBody(`
 								<p>Welcome to your new synchronized wiki!</p>
@@ -587,6 +588,7 @@ Formatted with `deno fmt`.
 								<p>The password will be used to encrypt your data, hiding the content from the server and, if you choose not to use the "remember password" option, against unauthorized users of this device.</p>
 								<p>You will have to use that password to open this wiki on all synchronized devices/browsers.</p>
 							`);
+							this.modal.setFresh();
 						} else if (state === 'existing') {
 							this.modal.setBody(`
 								<p>Welcome back to your synchronized wiki!</p>

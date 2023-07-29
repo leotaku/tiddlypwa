@@ -62,12 +62,16 @@ Formatted with `deno fmt`.
 
 		form = dm('form', { class: 'tiddlypwa-form' });
 		passLbl = dm('label', { innerHTML: 'Password' });
-		passInput = dm('input', { attributes: { type: 'password' } });
+		passInput = dm('input', { attributes: { type: 'password', name: 'password', autocomplete: 'current-password' } });
 		submit = dm('button', { attributes: { type: 'submit' }, text: 'Log in' });
 		feedback = dm('div', {});
 
 		setFeedback(html) {
 			this.feedback.innerHTML = html;
+		}
+
+		setFresh() {
+			this.passInput.setAttribute('autocomplete', 'new-password');
 		}
 
 		showForm(empty) {
@@ -107,7 +111,7 @@ Formatted with `deno fmt`.
 		addTokenInput(handlerFunction) {
 			const tokLbl = dm('label', { text: 'Sync token' });
 			tokLbl.appendChild(dm('input', {
-				attributes: { type: 'password' },
+				attributes: { type: 'text', name: 'username', autocomplete: 'username' },
 				eventListeners: [{ name: 'change', handlerFunction }],
 			}));
 			this.form.appendChild(tokLbl);
@@ -123,7 +127,7 @@ Formatted with `deno fmt`.
 			});
 			const saltLbl = dm('label', { text: 'Salt' });
 			saltLbl.appendChild(dm('input', {
-				attributes: { type: 'text' },
+				attributes: { type: 'text', name: 'salt', autocomplete: 'off' },
 				eventListeners: [{ name: 'change', handlerFunction }],
 			}));
 			saltDtl.appendChild(saltLbl);
