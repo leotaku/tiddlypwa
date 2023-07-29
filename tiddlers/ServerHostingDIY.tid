@@ -27,3 +27,5 @@ or use a unix domain socket passing the path as `--socket` (you'll need to both 
 You can pass the `--dotenv` flag to make the app read variables from a `.env` file (which is mostly used in development with the included file that contains a hash of the `test` password.)
 
 You really need to have TLS working, so run this behind a reverse proxy like [[Caddy|https://caddyserver.com/]], [[H2O|https://h2o.examp1e.net/]] or [[Nginx|https://nginx.org/en/]].
+
+{{AfterServerHosting}}

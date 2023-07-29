@@ -1,0 +1,19 @@
+title: AfterServerHosting
+tags: [[TiddlyPWA Docs]]
+
+!! What to Do Next
+
+Opening the `/` home page of the hosted sync server will let you access the admin console with the admin password.
+There, you can create "wikis", i.e. storage slots that can store synchronized tiddlers ''and'' an app wiki, i.e. the TiddlyWiki HTML file with plugins and themes in it.
+
+Hosting the app wiki on the sync server is not obligatory, but ''highly recommend'' because it simplifies setup on multiple devices and allows easy plugin/theme installation.
+
+Once you have created a storage slot, you get a token that you can use for syncing the tiddlers and uploading the app wiki.
+
+* if you've ''just created the slot'', you can use [[UploadApp]] from here to upload a fresh app wiki;
+* if you've ''already'' synced with it from a local-only wiki (e.g. opened from [[here|TiddlyPWA]] using the "Try It Now" form), click the {{$:/core/images/save-button}} save button inside it, select the "{{$:/plugins/valpackett/tiddlypwa/save-dialog-app!!caption}}" tab and click "upload the app wiki to sync servers".
+
+Upon uploading the app wiki, you'll see the URL for the hosted app wiki. Now you should bookmark that URL and use it to access the wiki.
+It will also be accessible from the admin panel, by clicking the app wiki size.
+
+Enjoy!

@@ -13,7 +13,11 @@ Just make up an admin password and click the remix button that appears:
 
 </div>
 
-You can even do this without an account!
+Note: the admin password SHOULD NOT match any wiki password!
+
+By the way, you can even do this without an account.
 However anonymous apps on Glitch expire in 5 days and only have 120 hours of running time, so you should sign up.
 
 The admin password can be changed later: use [[HashAdminPassword]] and put the results in the `.env` file in the project editor.
+
+{{AfterServerHosting}}
