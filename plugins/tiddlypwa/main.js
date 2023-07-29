@@ -286,6 +286,7 @@ Formatted with `deno fmt`.
 			} catch (e) {
 				console.error(e);
 				if (!navigator.onLine) return;
+				if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
 				$tw.wiki.addTiddler({ title: '$:/status/TiddlyPWAWorkerError', text: e.message });
 				$tw.notifier.display('$:/plugins/valpackett/tiddlypwa/notif-sw-error');
 			}
