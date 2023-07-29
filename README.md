@@ -10,3 +10,13 @@ and efficient **synchronization** with a server that can easily be hosted for fr
 To learn more, visit:
 
 https://tiddly.packett.cool
+
+## Development Notes
+
+`deno fmt` must be used for formatting.
+
+Building the html files (assuming Notebook theme repo cloned in the listed directory):
+
+```shell
+TIDDLYWIKI_THEME_PATH=$HOME/src/github.com/paul-rouse/Notebook/themes TIDDLYWIKI_PLUGIN_PATH=$HOME/src/github.com/paul-rouse/Notebook/plugins npx tiddlywiki@5.3.0 --build
+```
