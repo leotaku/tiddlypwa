@@ -264,6 +264,17 @@ Formatted with `deno fmt`.
 			});
 		}
 
+		firstChange() {
+			return new Promise((resolve) => {
+				const wiki = this.wiki;
+				// This relies on the sequential ordering of handlers inside the event implementation
+				this.wiki.addEventListener('change', /* not arrow */ function () {
+					wiki.removeEventListener('change', this);
+					resolve();
+				});
+			});
+		}
+
 		missingFeaturesWarning() {
 			const crit = [
 				!isSecureContext &&
@@ -439,16 +450,7 @@ Formatted with `deno fmt`.
 			console.time('initial add');
 			this.modal.setFeedback(`<p>Loading tiddlers…</p>`);
 			// Waiting for one change event prevents unlocking before the adding is actually done
-			const themHandlers = toAdd.length > 0
-				? new Promise((resolve) => {
-					const wiki = this.wiki;
-					// This relies on the sequential ordering of handlers inside the event implementation
-					this.wiki.addEventListener('change', /* not arrow */ function () {
-						wiki.removeEventListener('change', this);
-						resolve();
-					});
-				})
-				: Promise.resolve();
+			const themHandlers = toAdd.length > 0 ? this.firstChange() : Promise.resolve();
 			// Adds are batched all together SYNCHRONOUSLY to prevent event handlers from running on every add!
 			// storeTiddler is basically addTiddler but store info to prevent syncer from creating save tasks later
 			for (const tid of toAdd) $tw.syncer.storeTiddler(tid);
@@ -462,15 +464,17 @@ Formatted with `deno fmt`.
 					console.error(e);
 				}
 			}, 300);
-			{
-				// Old $:/DefaultTiddlers has been used, rerun (XXX: openStartupTiddlers should be exported)
-				const aEL = $tw.rootWidget.addEventListener;
-				$tw.rootWidget.addEventListener = () => {};
-				require('$:/core/modules/startup/story.js').startup();
-				$tw.rootWidget.addEventListener = aEL;
-			}
+			this.openStartupStory(); // Old $:/DefaultTiddlers has been used
 			this.backgroundSync();
 			return true;
+		}
+
+		openStartupStory() {
+			// XXX: TW core should export openStartupTiddlers
+			const aEL = $tw.rootWidget.addEventListener;
+			$tw.rootWidget.addEventListener = () => {};
+			require('$:/core/modules/startup/story.js').startup();
+			$tw.rootWidget.addEventListener = aEL;
 		}
 
 		initDb(db) {
@@ -597,6 +601,11 @@ Formatted with `deno fmt`.
 							`);
 							askSalt = false;
 							this.salt = b64dec(salt);
+							// XXX: upstream: we should be able to await syncFromServer
+							this.afterSyncOnceHook = async () => {
+								await this.firstChange(); // Assume the changes will come batched, because well, we queue them up synchronously
+								this.openStartupStory();
+							};
 						} else {
 							this.modal.setBody(`
 								<p>We are not quite sure what happened on the sync server...</p>
@@ -1096,6 +1105,7 @@ Formatted with `deno fmt`.
 		}
 
 		async _syncManyUnlocked(all) {
+			let hadSuccess = false;
 			const servers = [];
 			await new Promise((resolve) =>
 				this.db.transaction('syncservers').objectStore('syncservers').openCursor().onsuccess = (evt) => {
@@ -1111,6 +1121,7 @@ Formatted with `deno fmt`.
 				try {
 					server.lastSync = await this._syncOneUnlocked(server, all);
 					await adb(this.db.transaction('syncservers', 'readwrite').objectStore('syncservers').put(server, key));
+					hadSuccess = true;
 				} catch (e) {
 					if (e.name !== 'AbortError') {
 						this.logger.alert(`Could not sync with server "${server.url}"!`, e);
@@ -1123,6 +1134,10 @@ Formatted with `deno fmt`.
 			await this.reflectStorageInfo();
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncing', text: 'no' });
 			this.isSyncing = false;
+			if (this.afterSyncOnceHook && hadSuccess) {
+				this.afterSyncOnceHook();
+				delete this.afterSyncOnceHook;
+			}
 		}
 
 		sync(all) {
