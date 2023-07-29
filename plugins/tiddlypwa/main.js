@@ -608,11 +608,20 @@ Formatted with `deno fmt`.
 						}
 						if (askSalt) {
 							this.modal.addSaltInput((e) => {
-								try {
-									this.salt = b64dec(e.target.value.trim());
+								const saltText = e.target.value.trim();
+								if (saltText.length == 0) {
+									this.salt = null;
 									this.modal.setFeedback('');
-								} catch (_e) {
-									this.modal.setFeedback('<p class=tiddlypwa-form-error>Could not decode the salt</p>');
+								} else if (saltText.length < 16) {
+									this.salt = null;
+									this.modal.setFeedback('<p class=tiddlypwa-form-error>The salt is too short</p>');
+								} else {
+									try {
+										this.salt = b64dec(saltText);
+									} catch (_e) {
+										this.salt = null;
+										this.modal.setFeedback('<p class=tiddlypwa-form-error>Could not decode the salt</p>');
+									}
 								}
 							});
 						}
