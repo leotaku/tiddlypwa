@@ -581,6 +581,7 @@ Formatted with `deno fmt`.
 							`);
 							askToken = false;
 							this.modal.setFresh();
+							this.wiki.addTiddler({ title: '$:/status/TiddlyPWAWasLocalOnly', text: 'yes' });
 						} else if (state === 'fresh') {
 							this.modal.setBody(`
 								<p>Welcome to your new synchronized wiki!</p>
