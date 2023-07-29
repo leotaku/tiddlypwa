@@ -12,9 +12,15 @@ The encryption accomplishes the following goals:
 * unless you use the "remember password" functionality, it prevents unauthorized local access (think giving your phone to a friend for a moment: if you don't leave the wiki open, they would not be able to read your secret notes without knowing your password);
 * it prevents snooping on the sync server side (be it the friend who hosts your server if you don't do it yourself, or the hosting provider).
 
+The tiddlers are encrypted with keys derived from a wiki password.
+This does mean that ''you must not lose your password'' if you want to keep having access to the tiddlers.
+
+You cannot directly change the password, but you can export tiddlers (unencrypted!) using the "export all → JSON" functionality in the "Tools" menu of the sidebar
+and import them into a new wiki that uses a different password.
+
 !! Active Attacks
 
-If you host the app wiki on the sync server, i.e. if you use the default recommended full experience, it is however true
+If you host the app wiki on the sync server, i.e. if you use the default recommended full experience, it is true
 that an active server-side attacker could at any time "update" the app wiki to a malicious version that would leak
 your secrets to the attacker.
 To be frank, this is a very paranoid concern for the vast majority of use cases, especially with self-hosting:
@@ -27,6 +33,7 @@ There are ways to improve that situation and eliminate or reduce the need to tru
 
 You can simply not host the app wiki on the sync server and host it elsewhere.
 You could even just use it as a local HTML file and sync it separately using Syncthing for example,
+or use any traditional TiddlyWiki saving methods including mobile apps,
 or trust a separate static web host instead of a sync server (say if you don't host a sync server but use your friends' one).
 The user experience is currently not optimized for this use case, but improvements won't be hard to implement.
 
