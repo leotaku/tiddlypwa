@@ -64,8 +64,12 @@ function stripWeak(x: string | null) {
 	return x && (x.startsWith('W/') ? x.slice(2) : x);
 }
 
+function supportsEncoding(headers: Headers, enc: string): boolean {
+	return !!headers.get('accept-encoding')?.split(',').find((x) => x.trim().split(';')[0] === enc);
+}
+
 function processEtag(etag: Uint8Array, headers: Headers): [boolean, string] {
-	const supportsBrotli = !!headers.get('accept-encoding')?.split(',').find((x) => x.trim().split(';')[0] === 'br');
+	const supportsBrotli = supportsEncoding(headers, 'br');
 	return [supportsBrotli, '"' + base64.encode(etag) + (supportsBrotli ? '-b' : '-x') + '"'];
 }
 
@@ -73,6 +77,10 @@ function notifyMonitors(token: string, browserToken: string) {
 	const chan = new BroadcastChannel(token);
 	chan.postMessage({ exclude: browserToken });
 	// chan.close(); // -> Uncaught (in promise) BadResource: Bad resource ID ?!
+}
+
+function streamsponse(start: ReadableStreamDefaultControllerCallback<string>, init: ResponseInit | undefined) {
+	return new Response(new ReadableStream({ start }).pipeThrough(new TextEncoderStream()), init);
 }
 
 export class TiddlyPWASyncApp {
@@ -110,42 +118,51 @@ export class TiddlyPWASyncApp {
 		}
 		const modsince = new Date(lastSync);
 
-		const serverChanges: Array<Record<string, string | Date | boolean | null>> = [];
-		// console.log('---');
-		this.db.transaction(() => {
-			if (!(wiki as Wiki).authcode && authcode) this.db.updateWikiAuthcode(token, authcode);
-			if (!(wiki as Wiki).salt && salt) this.db.updateWikiSalt(token, salt as string);
-			for (const { thash, iv, ct, sbiv, sbct, mtime, deleted } of this.db.tiddlersChangedSince(token, modsince)) {
-				// console.log('ServHas', base64nourl.encode(thash as Uint8Array), mtime, modsince, mtime < modsince);
-				serverChanges.push({
-					thash: thash ? base64nourl.encode(thash as Uint8Array) : null,
-					iv: iv ? base64nourl.encode(iv as Uint8Array) : null,
-					ct: ct ? base64nourl.encode(ct as Uint8Array) : null,
-					sbiv: sbiv ? base64nourl.encode(sbiv as Uint8Array) : null,
-					sbct: sbct ? base64nourl.encode(sbct as Uint8Array) : null,
-					mtime,
-					deleted,
-				});
-			}
-			// console.log('ClntChg', clientChanges);
-			for (const { thash, iv, ct, sbiv, sbct, mtime, deleted } of clientChanges) {
-				this.db.upsertTiddler(token, {
-					thash: base64nourl.decode(thash),
-					iv: iv && base64nourl.decode(iv),
-					ct: ct && base64nourl.decode(ct),
-					sbiv: sbiv && base64nourl.decode(sbiv),
-					sbct: sbct && base64nourl.decode(sbct),
-					mtime: new Date(mtime || now),
-					deleted: deleted || false,
-				});
-			}
-		});
-
-		if (clientChanges.length > 0 && typeof browserToken === 'string') notifyMonitors(token, browserToken);
 		// assuming here that the browser would use the same Accept-Encoding as when requesting the page
 		const apphtml = this.db.getWikiFile(token, 'app.html');
 		const [_, appEtag] = apphtml ? processEtag(apphtml.etag, headers) : [null, null];
-		return Response.json({ serverChanges, appEtag }, { headers: respHdrs });
+
+		return streamsponse((ctrl) => {
+			ctrl.enqueue(`{"appEtag":${JSON.stringify(appEtag)},"serverChanges":[`);
+
+			this.db.transaction(() => {
+				if (!(wiki as Wiki).authcode && authcode) this.db.updateWikiAuthcode(token, authcode);
+				if (!(wiki as Wiki).salt && salt) this.db.updateWikiSalt(token, salt as string);
+				let firstWritten = false;
+				for (const { thash, iv, ct, sbiv, sbct, mtime, deleted } of this.db.tiddlersChangedSince(token, modsince)) {
+					// console.log('ServHas', base64nourl.encode(thash as Uint8Array), mtime, modsince, mtime < modsince);
+					ctrl.enqueue(
+						(firstWritten ? '\n,' : '\n') + JSON.stringify({
+							thash: thash ? base64nourl.encode(thash as Uint8Array) : null,
+							iv: iv ? base64nourl.encode(iv as Uint8Array) : null,
+							ct: ct ? base64nourl.encode(ct as Uint8Array) : null,
+							sbiv: sbiv ? base64nourl.encode(sbiv as Uint8Array) : null,
+							sbct: sbct ? base64nourl.encode(sbct as Uint8Array) : null,
+							mtime,
+							deleted,
+						}),
+					);
+					if (!firstWritten) firstWritten = true;
+				}
+				// console.log('ClntChg', clientChanges);
+				for (const { thash, iv, ct, sbiv, sbct, mtime, deleted } of clientChanges) {
+					this.db.upsertTiddler(token, {
+						thash: base64nourl.decode(thash),
+						iv: iv && base64nourl.decode(iv),
+						ct: ct && base64nourl.decode(ct),
+						sbiv: sbiv && base64nourl.decode(sbiv),
+						sbct: sbct && base64nourl.decode(sbct),
+						mtime: new Date(mtime || now),
+						deleted: deleted || false,
+					});
+				}
+			});
+			ctrl.enqueue('\n]}');
+			ctrl.close();
+			if (clientChanges.length > 0 && typeof browserToken === 'string') notifyMonitors(token, browserToken);
+		}, {
+			headers: { ...respHdrs, 'content-type': 'application/json' },
+		});
 	}
 
 	@adminAuth
