@@ -105,6 +105,23 @@ Formatted with `deno fmt`.
 		return url === `${location.origin}${location.pathname}${location.search}`;
 	}
 
+	const knownFields = new Set(['created', 'creator', 'modified', 'modifier', 'tags', 'text', 'title', 'type', 'uri']);
+
+	// Certain tiddlers must NEVER use _is_skinny lazy-loading
+	function mustEagerLoad(tid) {
+		// e.g. $:/DefaultTiddlers
+		if (tid.title.startsWith('$:')) return true;
+		// e.g. $:/tags/Macro, $:/tags/ManifestIcon
+		for (const t of $tw.Tiddler.fieldModules.tags.parse(tid.tags) || []) {
+			if (typeof t === 'string' && t.startsWith('$:')) return true;
+		}
+		// e.g. se-type from the Section Editor plugin https://codeberg.org/valpackett/tiddlypwa/issues/23
+		// (Actually that case is about core not firing lazyLoad when a custom viewtemplate is used,
+		//  but we can imagine other kinds of custom-field-having tiddlers needing content always loaded)
+		for (const k of Object.keys(tid)) if (!knownFields.has(k)) return true;
+		return false;
+	}
+
 	class FetchError extends Error {
 		constructor(cause) {
 			super('fetch failed');
@@ -434,12 +451,7 @@ Formatted with `deno fmt`.
 					// not isReady yet, can safely addTiddler
 					const tid = await this.parseEncryptedTiddler({ thash, ct, iv });
 					if (sbiv && sbct) {
-						// These we need to eager-load no matter what, e.g. we could have a huge DefaultTiddlers end up as separate body
-						// Tags are also checked for $: due to $:/tags/Macro, $:/tags/ManifestIcon, etc.
-						if (
-							tid.title.startsWith('$:') ||
-							$tw.Tiddler.fieldModules.tags.parse(tid.tags)?.find((x) => typeof x === 'string' && x.startsWith('$:'))
-						) {
+						if (mustEagerLoad(tid)) {
 							tid.text = await decodeData(
 								await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sbiv }, this.enckey(thash), sbct),
 							);
