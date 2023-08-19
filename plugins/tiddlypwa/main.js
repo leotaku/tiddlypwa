@@ -109,6 +109,8 @@ Formatted with `deno fmt`.
 
 	// Certain tiddlers must NEVER use _is_skinny lazy-loading
 	function mustEagerLoad(tid) {
+		// XXX: for now it really is just kinda more trouble than it's worth :(
+		if (location.hash !== '##lazy') return true;
 		// e.g. $:/DefaultTiddlers
 		if (tid.title.startsWith('$:')) return true;
 		// e.g. $:/tags/Macro, $:/tags/ManifestIcon
