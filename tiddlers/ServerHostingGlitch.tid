@@ -21,3 +21,11 @@ However anonymous apps on Glitch expire in 5 days and only have 120 hours of run
 The admin password can be changed later: use [[HashAdminPassword]] and put the results in the `.env` file in the project editor.
 
 {{AfterServerHosting}}
+
+!! Updating
+
+You can use the Terminal in the Glitch editor to quickly update the server by pasting this command:
+
+`/app/.deno/bin/deno cache --reload https://codeberg.org/valpackett/tiddlypwa/raw/branch/release/server/run.ts && killall deno`
+
+The `refresh` command can also be used, it forces a reinstall of all dependencies including Deno itself.

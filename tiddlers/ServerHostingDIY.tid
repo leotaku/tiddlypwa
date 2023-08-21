@@ -30,3 +30,9 @@ You really need to have TLS (HTTPS) working, so run this behind a reverse proxy 
 Caddy is famous for fully integrated [[automatic HTTPS|https://caddyserver.com/docs/automatic-https]] support, supporting [[Let's Encrypt|https://letsencrypt.org/]] on the public web as well working with [[Tailscale|https://tailscale.com/]]'s HTTPS support.
 
 {{AfterServerHosting}}
+
+!! Updating
+
+To refresh the cached version of the server scripts, you can use this command:
+
+`deno cache --reload https://codeberg.org/valpackett/tiddlypwa/raw/branch/release/server/run.ts`
