@@ -156,12 +156,10 @@ export class SQLiteDatastore extends DB implements Datastore {
 		SELECT thash, iv, ct, sbiv, sbct, mtime, deleted
 		FROM tiddlers WHERE mtime > :modsince AND token = :token
 	`);
-	tiddlersChangedSince(token: string, since: Date) {
-		const results = [];
+	*tiddlersChangedSince(token: string, since: Date) {
 		for (const tiddler of this.#changedQuery.iterEntries({ modsince: since.getTime(), token })) {
-			results.push({ ...tiddler, mtime: parseTime(tiddler.mtime), deleted: !!tiddler.deleted });
+			yield { ...tiddler, mtime: parseTime(tiddler.mtime), deleted: !!tiddler.deleted };
 		}
-		return results;
 	}
 
 	#upsertQuery = this.prepareQuery(sql`

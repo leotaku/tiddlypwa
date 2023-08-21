@@ -37,6 +37,6 @@ export interface Datastore {
 	storeFile(file: File): void;
 	associateFile(token: string, etag: Uint8Array, name: string): void;
 	getWikiFile(halftoken: string, name: string): File | undefined;
-	tiddlersChangedSince(token: string, since: Date): Array<Tiddler>;
+	tiddlersChangedSince(token: string, since: Date): Generator<Tiddler>;
 	upsertTiddler(token: string, tiddler: Tiddler): void;
 }
