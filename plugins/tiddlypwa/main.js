@@ -917,6 +917,12 @@ Formatted with `deno fmt`.
 		}
 
 		async uploadAppWiki(variables) {
+			if (!this.wiki.getTiddler('$:/core') || !this.wiki.getTiddler('$:/plugins/valpackett/tiddlypwa')) {
+				this.logger.alert(
+					'You have deleted the TiddlyPWA plugin and tried to save the app HTML to the server! Refusing to self-destruct.',
+				);
+				return;
+			}
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWAUploadResult', text: 'Upload in progress.' });
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWAUploading', text: 'yes' });
 			const apphtml = $tw.wiki.renderTiddler(
