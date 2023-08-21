@@ -837,14 +837,17 @@ Formatted with `deno fmt`.
 
 		saveTiddler(tiddler, cb) {
 			if (tiddler.fields._is_skinny) {
-				// Shouldn't get these, but just to be 100% sure.
+				// This probably has prevented data loss in the Section Editor case #23
 				return cb(null, '', 1);
 			}
 			if (tiddler.fields.title === '$:/Import') {
 				// For some reason this is not in the default $:/config/SyncFilter but no one would want this actually stored.
 				return cb(null, '', 1);
 			}
-			if (tiddler.fields.type === 'application/json' && tiddler.fields['plugin-type']) {
+			if (
+				(tiddler.fields.type === 'application/json' && tiddler.fields['plugin-type']) ||
+				(tiddler.fields.type === 'application/javascript' && tiddler.fields['module-type'])
+			) {
 				// By ignoring the callback we make TW think there's something unsaved now, which there is!
 				return;
 			}
