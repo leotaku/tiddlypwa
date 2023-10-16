@@ -848,8 +848,8 @@ Formatted with `deno fmt`.
 				(tiddler.fields.type === 'application/json' && tiddler.fields['plugin-type']) ||
 				(tiddler.fields.type === 'application/javascript' && tiddler.fields['module-type'])
 			) {
-				// By ignoring the callback we make TW think there's something unsaved now, which there is!
-				return;
+				$tw.syncer.isDirty = () => true; // make the UI insist on a save which would be the app save
+				return cb(null, '', 1);
 			}
 			this._saveTiddler(tiddler).then((_) => {
 				cb(null, '', 1);
