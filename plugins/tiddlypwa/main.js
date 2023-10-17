@@ -266,6 +266,10 @@ Formatted with `deno fmt`.
 				});
 			});
 
+			$tw.rootWidget.addEventListener('tiddlypwa-open-save-dialog', (evt) => {
+				$tw.modal.display('$:/plugins/valpackett/tiddlypwa/sync-dialog', {});
+			});
+
 			$tw.rootWidget.addEventListener('tiddlypwa-upload-app-wiki', (evt) => {
 				this.uploadAppWiki(evt.paramObject);
 			});
@@ -1181,6 +1185,7 @@ Formatted with `deno fmt`.
 			await this.reflectSyncServers();
 			await this.reflectStorageInfo();
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncing', text: 'no' });
+			$tw.utils.removeClass(document.body, 'tiddlypwa-syncing');
 			this.isSyncing = false;
 			if (this.afterSyncOnceHook && hadSuccess) {
 				this.afterSyncOnceHook();
@@ -1193,6 +1198,7 @@ Formatted with `deno fmt`.
 				return;
 			}
 			this.isSyncing = true;
+			$tw.utils.addClass(document.body, 'tiddlypwa-syncing');
 			this.wiki.addTiddler({ title: '$:/status/TiddlyPWASyncing', text: 'yes' });
 			return navigator.locks.request(`tiddlypwa:${location.pathname}`, (_lck) => this._syncManyUnlocked(all));
 		}

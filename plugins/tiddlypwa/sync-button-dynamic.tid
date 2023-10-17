@@ -1,0 +1,13 @@
+title: $:/plugins/valpackett/tiddlypwa/sync-button-dynamic
+tags: $:/tags/Image
+
+\parameters (size:"22pt")
+<svg width=<<size>> height=<<size>> class="tiddlypwa-image-sync-button-dynamic tc-image-button" viewBox="0 0 32 32">
+<g class="tiddlypwa-image-sync-button-dynamic-idle">
+<path d="M27.883 16.078c0.076-0.347 0.117-0.708 0.117-1.078 0-2.761-2.239-5-5-5-0.445 0-0.875 0.058-1.285 0.167-0.775-2.417-3.040-4.167-5.715-4.167-2.73 0-5.033 1.823-5.76 4.318-0.711-0.207-1.462-0.318-2.24-0.318-4.418 0-8 3.582-8 8s3.582 8 8 8h19c2.761 0 5-2.239 5-5 0-2.46-1.777-4.505-4.117-4.922zM13 24l-5-5 2-2 3 3 7-7 2 2-9 9z"></path>
+</g>
+<g class="tiddlypwa-image-sync-button-dynamic-syncing">
+<path d="M27.802 5.197c-2.925-3.194-7.13-5.197-11.803-5.197-8.837 0-16 7.163-16 16h3c0-7.18 5.82-13 13-13 3.844 0 7.298 1.669 9.678 4.322l-4.678 4.678h11v-11l-4.198 4.197z"></path>
+<path d="M29 16c0 7.18-5.82 13-13 13-3.844 0-7.298-1.669-9.678-4.322l4.678-4.678h-11v11l4.197-4.197c2.925 3.194 7.13 5.197 11.803 5.197 8.837 0 16-7.163 16-16h-3z"></path>
+</g>
+</svg>

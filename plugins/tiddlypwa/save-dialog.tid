@@ -37,4 +37,4 @@ and manually manage the app files.
 </$reveal>
 
 <$macrocall $name="tabs" tabsList="[all[tiddlers+shadows]tag[$:/tags/TiddlyPWA/SaveDialog]!has[draft.of]]"
-default="$:/plugins/valpackett/tiddlypwa/save-dialog-sync" explicitState="$:/state/tab--28743853"/>
+default="$:/plugins/valpackett/tiddlypwa/save-dialog-app" explicitState="$:/state/tab--28743853"/>

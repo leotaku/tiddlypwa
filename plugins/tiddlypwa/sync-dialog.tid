@@ -1,6 +1,5 @@
-title: $:/plugins/valpackett/tiddlypwa/save-dialog-sync
-tags: $:/tags/TiddlyPWA/SaveDialog
-caption: Sync Status
+title: $:/plugins/valpackett/tiddlypwa/sync-dialog
+subtitle: Sync Status
 
 \define tv-wikilinks() no
 
