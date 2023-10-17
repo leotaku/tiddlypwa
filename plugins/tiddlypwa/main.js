@@ -138,6 +138,7 @@ Formatted with `deno fmt`.
 
 		constructor(options) {
 			this.wiki = options.wiki;
+			this.tiddlersInFile = new Set(this.wiki.getTiddlers({ includeSystem: true }));
 			this.logger = new $tw.utils.Logger('tiddlypwa-storage');
 			this.monitorTimeout = 2000;
 			this.modifiedQueue = new Set();
@@ -910,6 +911,11 @@ Formatted with `deno fmt`.
 				cb(null);
 				this.changesChannel.postMessage({ title, del: true });
 				this.backgroundSync();
+				if (this.tiddlersInFile.has(title)) {
+					this.logger.alert(
+						`You have deleted the tiddler <code>${title}</code> which was in the app wiki file. If you want it gone, you must also save the app wiki; conversely, you can refresh the page to restore it.`,
+					);
+				}
 			}).catch((e) => {
 				console.error(e);
 				cb(e);
