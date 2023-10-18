@@ -28,6 +28,7 @@ You can pass the `--dotenv` flag to make the app read variables from a `.env` fi
 
 You really need to have TLS (HTTPS) working, so run this behind a reverse proxy like [[Caddy|https://caddyserver.com/]], [[H2O|https://h2o.examp1e.net/]] or [[Nginx|https://nginx.org/en/]].
 Caddy is famous for fully integrated [[automatic HTTPS|https://caddyserver.com/docs/automatic-https]] support, supporting [[Let's Encrypt|https://letsencrypt.org/]] on the public web as well working with [[Tailscale|https://tailscale.com/]]'s HTTPS support.
+(Also [[caddy-tailscale|https://github.com/tailscale/caddy-tailscale]] exists for hosting a bunch of as separate Tailscale hosts!)
 
 {{AfterServerHosting}}
 
@@ -36,3 +37,28 @@ Caddy is famous for fully integrated [[automatic HTTPS|https://caddyserver.com/d
 To refresh the cached version of the server scripts, you can use this command:
 
 `deno cache --reload https://codeberg.org/valpackett/tiddlypwa/raw/branch/release/server/run.ts`
+
+!! Security
+
+Thanks to Deno providing [[sandboxing|https://docs.deno.com/runtime/manual/basics/permissions]] by default, the server process does not get permission to access anything other than what was specified in the `--allow-*` flags.
+You can be confident that unless there's a horrible bug in the Deno runtime, the code is unable to touch anything outside of the database directory, nor is it able to contact external network services, nor launch processes.
+
+If you're paranoid enough to audit all the server code, you can use the [[deno info|https://docs.deno.com/runtime/manual/tools/dependency_inspector]] dependency inspector and/or [[deno vendor|https://docs.deno.com/runtime/manual/tools/vendor]] which conveniently places everything in a friendly directory tree instead of the cache, making it a lot more convenient to review.
+You can then add `--no-remote --import-map path/to/vendor/import_map.json` flags to the `deno run` invocation (and you can still refer to the URL!) to strongly guarantee that Deno will only run code from the directory you reviewed.
+
+!! Single-Binary Deployment
+
+It's possible to use [[deno compile|https://docs.deno.com/runtime/manual/tools/compiler]] to bundle all the server code together with the Deno runtime itself into a single binary.
+Rather annoyingly, the Deno runtime flags such as `--allow-*` have to be specified at `deno compile` time so you better decide on the possible database directory paths and listening ports/sockets beforehand :)
+
+The commands would look like this:
+
+```
+deno compile -o tiddlypwa-sync-server \
+	--unstable --allow-env \
+	--allow-read=/var/db/tiddly --allow-write=/var/db/tiddly \
+	--allow-net=:8000 \
+	https://codeberg.org/valpackett/tiddlypwa/raw/branch/release/server/run.ts
+
+ADMIN_PASSWORD_HASH=Zn…PQ ADMIN_PASSWORD_SALT=q6…0o DB_PATH=/var/db/tiddly/pwa.db ./tiddlypwa-sync-server
+```
