@@ -1191,10 +1191,15 @@ Formatted with `deno fmt`.
 				this.afterSyncOnceHook();
 				delete this.afterSyncOnceHook;
 			}
+			if (this.wantResync) {
+				this.wantResync = false;
+				this.backgroundSync();
+			}
 		}
 
 		sync(all) {
 			if (this.isSyncing) {
+				this.wantResync = true;
 				return;
 			}
 			this.isSyncing = true;
