@@ -87,11 +87,13 @@ export class TiddlyPWASyncApp {
 	db: Datastore;
 	adminpwsalt: Uint8Array;
 	adminpwhash: Uint8Array;
+	basepath: string;
 
-	constructor(db: Datastore, adminpwsalt: string, adminpwhash: string) {
+	constructor(db: Datastore, adminpwsalt: string, adminpwhash: string, basepath: string = '') {
 		this.db = db;
 		this.adminpwsalt = base64.decode(adminpwsalt);
 		this.adminpwhash = base64.decode(adminpwhash);
+		this.basepath = basepath;
 	}
 
 	adminPasswordCorrect(atoken: string) {
@@ -291,7 +293,7 @@ export class TiddlyPWASyncApp {
 		}
 		if (filename === 'bootstrap.json') {
 			return Response.json({
-				endpoint: '/tid.dly',
+				endpoint: this.basepath + '/tid.dly',
 				state: wiki.salt ? 'existing' : 'fresh',
 				salt: wiki.salt,
 			}, { headers: respHdrs });

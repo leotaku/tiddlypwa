@@ -107,7 +107,7 @@ export const homePage = html`
 						const appsizeTd = document.createElement('td');
 						if (appsize > 0) {
 							const appsizeA = document.createElement('a');
-							appsizeA.href = '/' + token.slice(0, token.length / 2) + '/app.html';
+							appsizeA.href = new URL(token.slice(0, token.length / 2) + '/app.html', document.location).toString();
 							appsizeA.innerText = formatBytes(appsize);
 							appsizeTd.appendChild(appsizeA);
 						} else {

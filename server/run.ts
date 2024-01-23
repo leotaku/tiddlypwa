@@ -11,8 +11,9 @@ export async function listen(args: any) {
 	const envvar = (name: string) => Deno.env.get(name) ?? denv[name];
 	const adminpwhash = (args.adminpwhash ?? envvar('ADMIN_PASSWORD_HASH'))?.trim();
 	const adminpwsalt = (args.adminpwsalt ?? envvar('ADMIN_PASSWORD_SALT'))?.trim();
+	const basepath = args.basepath ?? envvar('BASE_PATH') ?? '';
 	const db = new SQLiteDatastore(args.db ?? envvar('DB_PATH') ?? '.data/tiddly.db');
-	const app = new TiddlyPWASyncApp(db, adminpwsalt, adminpwhash);
+	const app = new TiddlyPWASyncApp(db, adminpwsalt, adminpwhash, basepath);
 	const listen: any = { port: 8000 };
 	if ('port' in args) {
 		listen.port = args.port;
