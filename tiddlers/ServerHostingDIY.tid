@@ -30,6 +30,8 @@ You really need to have TLS (HTTPS) working, so run this behind a reverse proxy 
 Caddy is famous for fully integrated [[automatic HTTPS|https://caddyserver.com/docs/automatic-https]] support, supporting [[Let's Encrypt|https://letsencrypt.org/]] on the public web as well working with [[Tailscale|https://tailscale.com/]]'s HTTPS support.
 (Also [[caddy-tailscale|https://github.com/tailscale/caddy-tailscale]] exists for hosting a bunch of as separate Tailscale hosts!)
 
+When running behind a reverse proxy that rewrites paths, you can customize the base path used for wiki using the `--basepath` flag. It should match the respective Caddy rewrite directive / H2O path / Nginx location, without a trailing backslash. By default, the server assumes no path rewriting takes place.
+
 {{AfterServerHosting}}
 
 !! Updating
