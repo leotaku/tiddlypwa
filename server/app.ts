@@ -15,21 +15,18 @@ function route(methods: string[], pathname: string) {
 	const pat = new URLPattern({ pathname });
 	const methodSet = new Set(methods);
 	const allow = methods.join(', ');
-	return function (_target: unknown, _key: string, descriptor: PropertyDescriptor) {
-		const orig = descriptor.value;
-		descriptor.value = function (req: Request) {
+	return function (orig: any, context: ClassMethodDecoratorContext) {
+		return function (this: any, req: Request) {
 			const match = pat.exec(req.url);
 			if (!match) return null;
 			if (!methodSet.has(req.method)) return new Response(null, { status: 405, headers: { allow } });
 			return orig.apply(this, [req, match.pathname.groups]);
 		};
-		return descriptor;
 	};
 }
 
-function adminAuth(_target: unknown, _key: string, descriptor: PropertyDescriptor) {
-	const orig = descriptor.value;
-	descriptor.value = function (data: Record<string, unknown>) {
+function adminAuth(orig: any, context: ClassMethodDecoratorContext) {
+	return function (this: any, data: Record<string, unknown>) {
 		if (typeof data.atoken !== 'string') {
 			return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 		}
@@ -38,13 +35,11 @@ function adminAuth(_target: unknown, _key: string, descriptor: PropertyDescripto
 		}
 		return orig.apply(this, [data]);
 	};
-	return descriptor;
 }
 
 function getWiki(error: string) {
-	return function (_target: unknown, _key: string, descriptor: PropertyDescriptor) {
-		const orig = descriptor.value;
-		descriptor.value = function (data: Record<string, unknown>, ...args: unknown[]) {
+	return function (orig: any, context: ClassMethodDecoratorContext) {
+		return function (this: any, data: Record<string, unknown>, ...args: unknown[]) {
 			if (typeof data.token !== 'string') {
 				return Response.json({ error: 'EPROTO' }, { headers: respHdrs, status: 400 });
 			}
@@ -54,7 +49,6 @@ function getWiki(error: string) {
 			}
 			return orig.apply(this, [{ ...data, wiki }, ...args]);
 		};
-		return descriptor;
 	};
 }
 
@@ -362,7 +356,7 @@ export class TiddlyPWASyncApp {
 			'x-content-type-options': 'nosniff',
 			'x-frame-options': 'SAMEORIGIN',
 			'content-security-policy':
-				'default-src \'self\'; script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\';',
+				"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';",
 		});
 		return new Response(req.method === 'HEAD' ? null : homePage, { headers });
 	}

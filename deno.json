@@ -7,9 +7,6 @@
 			"proseWrap": "preserve"
 		}
 	},
-	"compilerOptions": {
-		"experimentalDecorators": true
-	},
 	"unstable": ["broadcast-channel"],
 	"imports": {
 		"https://deno.land/std@0.159.0/": "https://deno.land/std@0.192.0/",
